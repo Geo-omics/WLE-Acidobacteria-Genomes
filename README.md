@@ -15,7 +15,7 @@ gANI_results.csv contains the results of dRep genome compare with published Acid
 
 Acidobacteria_16S_rRNA.fasta contains the near full-length 16S rRNA sequences used to build the RAXML trees.
 
-Acidobacteria_RP_L18.faa contains predicted amino acid sequences of Ribosoaml Protein L18 from Acidobacteria MAGs available in IMG.
+Acidobacteria_RP_L18.faa contains predicted amino acid sequences of Ribosomal Protein L18 from Acidobacteria MAGs available in IMG.
 
 The Acidobacteria_Genomes folder contains the whole genome fasta files of the genomes used in dRep compare gANI measurements.
 
