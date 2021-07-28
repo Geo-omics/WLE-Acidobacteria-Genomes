@@ -1,0 +1,248 @@
+Gene	TransportDB Annotation
+2807003591	sodium ion efflux
+2807003646	lipoprotein
+2807003647	lipoprotein releasing
+2807003714	efflux (antimicrobial peptide)
+2807003722	toluene tolerance
+2807003723	lipoprotein
+2807003724	toluene tolerance
+2807004120	daunorubicin
+2807004173	glycine betaine
+2807004208	daunorubicin
+2807004209	daunorubicin
+2807004210	multidrug
+2807004211	multidrug
+2807004241	spermidine/putrescine
+2807004242	spermidine/putrescine
+2807004243	spermidine/putrescine
+2807004244	polyamine
+2807004247	daunorubicin
+2807004248	multidrug
+2807004320	lipid A
+2807004350	efflux (antimicrobial peptide)
+2807004351	lipoprotein
+2807004371	heme
+2807004378	daunorubicin
+2807004459	polysaccharide export
+2807004526	daunorubicin
+2807004535	sugar (ribose)
+2807004536	sugar (ribose)
+2807004559	daunorubicin
+2807004560	unknown substrate
+2807004739	daunorubicin
+2807004776	lipoprotein
+2807004777	lipoprotein releasing
+2807005035	lipid A
+2807005059	daunorubicin
+2807005062	lipoprotein releasing
+2807005113	organic solvents
+2807005114	daunorubicin
+2807005134	toxin secretion
+2807005160	daunorubicin
+2807005270	heme
+2807005350	daunorubicin
+2807005550	mobybdenate
+2807005585	rhamnose
+2807005724	heme
+2807005800	lipid A
+2807005814	lipoprotein releasing
+2807005815	lipoprotein
+2807005915	efflux (antimicrobial peptide)
+2807005916	efflux (antimicrobial peptide)
+2807006094	thiamine
+2807006107	lipoprotein
+2807006108	unknown substrate
+2807006176	polysaccharide export
+2807006246	heme export
+2807006247	heme export
+2807006248	heme
+2807006372	lipoprotein
+2807006503	molybdate
+2807006504	molybdate
+2807006549	lipoprotein
+2807006630	lipoprotein
+2807006631	lipoprotein releasing
+2807006632	cobalamin/Fe3+-siderophores
+2807006633	phosphonate
+2807006634	iron-hydroxamate
+2807006840	lipid A
+2807006906	sulfate
+2807006914	multidrug
+2807006915	daunorubicin
+2807006929	lipoprotein releasing
+2807006930	lipoprotein
+2807006933	lipoprotein
+2807007107	glycine betaine
+2807007147	daunorubicin
+2807007180	rhamnose
+2807007196	lipoprotein
+2807007218	rhamnose
+2807007230	unknown substrate
+2807007232	cobalt
+2807007327	daunorubicin
+2807007329	daunorubicin
+2807007380	efflux (antimicrobial peptide)
+2807007589	lipid A
+2807007596	multidrug
+2807007964	efflux (antimicrobial peptide)
+2807008005	daunorubicin
+2807008006	multidrug
+2807008007	multidrug
+2807008090	efflux (antimicrobial peptide)
+2807008091	efflux (antimicrobial peptide)
+2807004440	Autoinducer-2 export
+2807004953	Autoinducer-2 export
+2807007618	ammonium
+2807003738	amino acid
+2807003932	amino acid
+2807003978	large neutral amino acid
+2807003979	amino acid
+2807005643	ethanolamine
+2807005967	large neutral amino acid
+2807006346	large neutral amino acid
+2807007226	amino acid
+2807007398	large neutral amino acid
+2807004644	arsenite (ArsB)
+2807005597	proton:calcium ion antiporter
+2807003659	cation efflux
+2807007312	cation efflux
+2807006850	sodium ion:nucleoside symporter
+2807004775	potassium/sodium ion:proton antiporter
+2807006201	potassium/sodium ion:proton antiporter
+2807003940	proton/sodium ion:glutamate/aspartate symporter
+2807004678	proton/sodium ion:glutamate/aspartate symporter
+2807003712	sodium ion:dicarboxylate/sulfate
+2807003710	drug/metabolite
+2807004106	drug/metabolite
+2807004184	drug/metabolite
+2807005118	drug/metabolite
+2807005925	drug/metabolite
+2807006827	drug/metabolite
+2807006842	drug/metabolite
+2807007977	drug/metabolite
+2807007909	unknown substrate
+2807005420	protons
+2807005421	protons
+2807005422	protons
+2807005630	protons
+2807006597	protons
+2807006598	protons
+2807006600	protons
+2807006601	protons
+2807006602	protons
+2807006603	protons
+2807005684	ferrous ion
+2807005973	ferrous ion
+2807006198	gluconate
+2807005051	glycerol:proton symporter
+2807005961	glycerol:proton symporter
+2807007037	proton (vacuolar)
+2807006185	hemolysin C (HlyC) homolog
+2807006237	hemolysin C (HlyC) homolog
+2807006754	unknown substrate
+2807007549	unknown substrate
+2807007550	unknown substrate
+2807007553	unknown substrate
+2807003857	unknown substrate
+2807006093	unknown substrate
+2807006380	unknown substrate
+2807005453	L-lactate
+2807003873	multidrug efflux
+2807004012	oxalate:formate antiporter
+2807004034	multidrug efflux
+2807004093	multidrug efflux
+2807004363	multidrug efflux
+2807004406	glycerol-3-phosphate
+2807004502	D-galactonate
+2807004744	multidrug efflux
+2807004839	D-galactonate
+2807005239	glycerol-3-phosphate
+2807005296	multidrug efflux (EmrB/QacA subfamily)
+2807005528	multidrug efflux
+2807005743	D-galactonate
+2807005771	metabolite (benzoate)
+2807005905	glycerol-3-phosphate
+2807005952	D-galactonate
+2807006169	multidrug efflux
+2807006182	multidrug efflux
+2807006580	multidrug efflux
+2807006666	D-galactonate
+2807006731	multidrug efflux
+2807006830	D-galactonate
+2807006841	multidrug efflux
+2807006970	sugar efflux
+2807007114	multidrug efflux
+2807007207	D-galactonate
+2807007223	D-galactonate
+2807007354	multidrug efflux
+2807007491	D-galactonate
+2807007640	D-galactonate
+2807007649	multidrug efflux
+2807007825	multidrug efflux
+2807008018	multidrug efflux
+2807005335	glycerol uptake
+2807005624	glycerol uptake
+2807004447	magnesium/cobalt ion
+2807003729	polysaccharide export
+2807004236	multidrug efflux
+2807006743	virulence factor MviN
+2807006838	polysaccharide export
+2807007399	multidrug efflux
+2807004717	unknown substrate
+2807004917	unknown substrate
+2807005115	unknown substrate
+2807005538	unknown substrate
+2807005955	large-conductance mechanosensitive ion channel
+2807006545	large-conductance mechanosensitive ion channel
+2807004633	small-conductance mechanosensitive ion channel
+2807004721	small-conductance mechanosensitive ion channel
+2807004521	unknown substrate
+2807005252	unknown substrate
+2807005253	unknown substrate
+2807007817	unknown substrate
+2807003887	xanthine/uracil
+2807004515	nickel ion
+2807006856	manganese/iron ion
+2807004716	unknown substrate
+2807005116	unknown substrate
+2807004259	oligopeptide
+2807007690	60 KD inner membrane protein OxaA homolog
+2807004077	zinc/cadmium/cobalt ion
+2807004668	zinc/cadmium/cobalt ion
+2807005275	calcium ion/manganese ion
+2807005694	zinc/cadmium/cobalt ion
+2807008073	magnesium ion
+2807006268	phosphate
+2807007041	proton:dipeptide/tripeptide symporter
+2807003675	multidrug/solvent efflux (HAE1 subfamily)
+2807003976	multidrug/solvent efflux (HAE1 subfamily)
+2807004715	cobalt/zinc/cadmium ion efflux (HME subfamily)
+2807004878	multidrug/solvent efflux (HAE1 subfamily)
+2807005007	multidrug/solvent efflux (HAE3 subfamily)
+2807006286	cobalt/zinc/cadmium ion efflux (HME subfamily)
+2807006416	multidrug/solvent efflux (HAE1 subfamily)
+2807006417	multidrug/solvent efflux (HAE1 subfamily)
+2807006496	multidrug/solvent efflux (HAE1 subfamily)
+2807007197	multidrug efflux
+2807007916	multidrug efflux
+2807007917	multidrug/solvent efflux (HAE1 subfamily)
+2807004225	sodium ion:proline symporter
+2807005322	sodium ion:proline symporter
+2807005721	sodium ion:proline symporter
+2807006024	sodium ion:proline symporter
+2807006345	sodium ion:proline symporter
+2807006354	sodium ion:proline symporter
+2807006397	sodium ion:proline symporter
+2807006528	sodium ion:proline symporter
+2807006552	sodium ion:proline symporter
+2807006853	sodium ion:proline symporter
+2807007866	sodium ion:proline symporter
+2807008061	sodium ion:proline symporter
+2807003795	sulfate
+2807007250	sulfate
+2807007876	sulfate
+2807006673	protein export
+2807006800	protein export
+2807006801	protein export
+2807005285	tellurium ion efflux
+2807007163	potassium ion channel
