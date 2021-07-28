@@ -75,3 +75,5 @@ sum_blast_hits.sh tallies the Amplicon reads mapped to 16S references.
 Summed_16S_hits_by_organism.txt is the output of sum_blast_hits.sh
 
 sra_metadata.txt contains the information about each sample downloaded from SRA.
+
+The LE_H2O2_* files contain OTU information from a previously published study (https://github.com/Geo-omics/Characterizing-individual-Microcystis-colony-phycosphere-communities) to screen for Acidobacteria sequences.
