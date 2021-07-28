@@ -1034,7 +1034,9 @@ nohup blastp -query Bryobacter_CoA8_C33_genes_simple_headers.faa -db P_denitrifi
 
 Filter out hits with low e-values:
 ```{bash}
+perl /geomicro/data1/COMMON/scripts/BlastTools/postBlast.pl -b Paludibaculum_glycolate_proteins.blastp -e 1e-5 -o Paludibaculum_glycolate_proteins.blastp.postblast.txt
 
+perl /geomicro/data1/COMMON/scripts/BlastTools/postBlast.pl -b Bryobacter_glycolate_proteins.blastp -e 1e-5 -o Bryobacter_glycolate_proteins.blastp.postblast.txt
 ```
 There are high quality hits at 40-30% identity for each gene in the operon, but they aren't located in an operon structure like the P denitrificans genes are.
 
