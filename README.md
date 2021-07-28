@@ -26,3 +26,12 @@ batch_top5.sh contains a custom shell script used to dereplicate read alignments
 
 Filter_out_short_alignments.sh removes read alignments with low query coverage in the center of genes.
 
+The following files contain IMG or NCBI gene annotation data:
+Bryobacter_CoA8_C33_annotations.txt
+Paludibaculum_CoA2_C42_annotations.txt
+Microcystis_NIES_2481_annotations.txt
+Microcystis_NIES_2549_annotations.txt
+Microcystis_PCC_7806SL_annotations.txt
+Microcystis_NIES_843_annotations.txt
+Microcystis_FD4_annotations.txt
+
