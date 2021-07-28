@@ -11,3 +11,10 @@ Acidobacteria_16S_rRNA.fasta contains the near full-length 16S rRNA sequences us
 Acidobacteria_RP_L18.faa contains predicted amino acid sequences of Ribosoaml Protein L18 from Acidobacteria MAGs available in IMG.
 
 The Acidobacteria_Genomes folder contains the whole genome fasta files of the genomes used in dRep compare gANI measurements.
+
+Paludibaculum_CoA2_C42.genes.simple_headers.fna contains the IMG predicted gene sequences from MAG CoA2_C42 to which metatranscriptomic reads were mapped.
+
+Bryobacter_CoA8_C33.fna contains the IMG predicted gene sequences from MAG CoA8_C33 to which metatranscriptomic reads were mapped.
+
+Microcystis_all.genes.fna contains all predicted gene sequences from Microcystis reference genomes obtained from IMG and NCBI. The included strains are Microcystis strain FD4, strain NIES 843, strain NIES 2481, strain NIES 2549, strain PCC7806SL.
+
