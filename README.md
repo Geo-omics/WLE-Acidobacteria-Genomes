@@ -13,8 +13,10 @@ Acidobacteria_RP_L18.faa contains predicted amino acid sequences of Ribosoaml Pr
 The Acidobacteria_Genomes folder contains the whole genome fasta files of the genomes used in dRep compare gANI measurements.
 
 Paludibaculum_CoA2_C42.genes.simple_headers.fna contains the IMG predicted gene sequences from MAG CoA2_C42 to which metatranscriptomic reads were mapped.
+Paludibaculum_CoA2_C42_simple_headers.genes.faa contains the IMG predicted amino acid sequences for each predicted gene in MAG CoA2_C42.
 
 Bryobacter_CoA8_C33.fna contains the IMG predicted gene sequences from MAG CoA8_C33 to which metatranscriptomic reads were mapped.
+Bryobacter_CoA8_C33_genes_simple_headers.faa contains the IMG predicted amino acid sequences for each predicted gene in MAG CoA8_C33.
 
 Microcystis_all.genes.fna contains all predicted gene sequences from Microcystis reference genomes obtained from IMG and NCBI. The included strains are Microcystis strain FD4, strain NIES 843, strain NIES 2481, strain NIES 2549, strain PCC7806SL.
 
@@ -45,4 +47,6 @@ Bryobacter_transporters.txt contains the TransportDB 2.0 annotations for MAG CoA
 
 Crocosphaera_Synechococcus_B12_genes.faa contain amino acid sequences of predicted vitmain B12 production genes in cultures that are confirmed B12 producers.
 
+Microcystis_PCC_7806SL.genes.faa contains amino acid sequences for all predicted Microcystis strain 7806SL genes.
 
+P_denitrificans_glycolate_util_genes.faa includes published amino acid sequences for novel proteins that allow glycolate use.
