@@ -38,3 +38,7 @@ Microcystis_FD4_annotations.txt
 get_read_counts_combined_genes.sh and get_read_counts_combined_genes_parallelized.sh tallies read counts for each gene. The parallelized script was used in final analysis.
 
 The output of the get_read_counts_combined_genes_parallelized.sh are the Prl_Read_counts_*.txt.QCd files.
+
+Paludibaculum_transporters.txt contains the TransportDB 2.0 annotations for MAG CoA2_C42
+
+Bryobacter_transporters.txt contains the TransportDB 2.0 annotations for MAG CoA8_C33
