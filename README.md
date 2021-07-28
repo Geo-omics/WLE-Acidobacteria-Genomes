@@ -1,6 +1,13 @@
 # WLE-Acidobacteria-Genomes
 This repository holds all code and scripts used during the analysis of Acidobacteria MAGs assembled from western Lake Erie Microcystis Blooms
 
+Required software:
+NCBI Blast v. 2.2.31+
+R and RMarkdown
+dRep v2.0.5
+Clustal Omega v. 1.2.1 
+RAxML v. 8.2.4 
+
 Explanation of Files:
 Acidobacteria_Genome_Analysis2.Rmd contains all of the bash and R code used during the analysis of two western Lake Erie Acidobacteria MAGs (MAGs CoA2 C42 and CoA8 C33). The assembly and binning of the MAG collection from which these MAGs were derived is descrbied here: https://github.com/Geo-omics/Heterotrophic-Bacteria-Dominate-Catalase-Expression-During-Microcystis-Blooms
 
@@ -50,3 +57,13 @@ Crocosphaera_Synechococcus_B12_genes.faa contain amino acid sequences of predict
 Microcystis_PCC_7806SL.genes.faa contains amino acid sequences for all predicted Microcystis strain 7806SL genes.
 
 P_denitrificans_glycolate_util_genes.faa includes published amino acid sequences for novel proteins that allow glycolate use.
+
+sra_explorer_curl_wrapper, sra_explorer_fastq_download.sh, and Lakes_Champlain_Mendota_sra_explorer_fastq_download.sh were used to download Public Amplicon Sequence data from freshwater lakes.
+
+iu-filter-quality-minoche.sh quality screens and trims downloaded amplicon sequence data.
+
+sra_explorer_iu_gen_configs_input.txt contains information on how samples are paired for QC.
+
+batch_bbduk.sh was used to QC single-end sequencing datasets downloaded from NCBI.
+
+Acidobacteria_16S_blast_wrapper.sh and Cyanobacteria_16S_blast_wrapper.sh were used to map variable regions of amplicon reads to reference sequences.
