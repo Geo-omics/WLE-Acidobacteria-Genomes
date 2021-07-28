@@ -1,0 +1,312 @@
+Gene	TransporterDB Annotation
+2806998375	D-galactonate
+2806998386	metabolite (benzoate)
+2806998387	sodium ion:proline symporter
+2806998441	LPS export ABC transporter permease LptF/LPS export ABC transporter permease LptG
+2806998476	metabolite (benzoate)
+2806998573	daunorubicin
+2806998574	polysaccharide export
+2806998588	proton/sodium ion:glutamate/aspartate symporter
+2806998607	multidrug efflux
+2806998628	D-galactonate
+2806998651	sulfate
+2806998713	iron complex transport system ATP-binding protein
+2806998670	small-conductance mechanosensitive ion channel
+2806998745	lipopolysaccharide transport system permease protein
+2806998674	chromate ion
+2806998675	chromate ion
+2806998702	protons
+2806998703	protons
+2806998709	tellurium ion efflux
+2806998713	daunorubicin
+2806998717	virulence factor MviN
+2806998726	daunorubicin
+2806998745	polysaccharide export
+2806998796	cation efflux
+2806998802	unknown substrate
+2806998828	phosphate
+2806998831	amino acid
+2806998860	multidrug
+2806998866	large neutral amino acid
+2806998867	sodium ion:proline symporter
+2806998881	efflux (antimicrobial peptide)
+2806998909	biopolymer transport protein ExbB/TolQ
+2806998923	polysaccharide export
+2806998934	glycerol:proton symporter
+2806998940	magnesium ion
+2806998962	unknown substrate
+2806998975	sodium ion:proline symporter
+2806999035	D-galactonate
+2806999045	hemolysin C (HlyC) homolog
+2806999046	chloride ion channel
+2806999064	unknown substrate
+2806999071	zinc/cadmium/cobalt ion
+2806999078	multidrug efflux
+2806999097	sodium ion:proton antiporter
+2806999102	drug/metabolite
+2806999103	drug/metabolite
+2806999127	glycerol-3-phosphate
+2806999179	multidrug efflux
+2806999220	ferrous ion
+2806999221	ferrous iron transport protein A
+2806999231	daunorubicin
+2806999241	D-galactonate
+2806999265	daunorubicin
+2806999281	glycerol uptake
+2806999302	RND family efflux transporter MFP subunit
+2806999303	multidrug/solvent efflux (HAE1 subfamily)
+2806999321	sodium ion:nucleoside symporter
+2806999323	polyamine
+2806999334	magnesium/cobalt ion
+2806999364	unknown substrate
+2806999376	spermidine/putrescine
+2806999377	spermidine/putrescine
+2806999378	polyamine
+2806999455	proton/sodium ion:glutamate/aspartate symporter
+2806999464	unknown substrate
+2806999465	unknown substrate
+2806999466	unknown substrate
+2806999467	unknown substrate
+2806999526	outer membrane receptor protein involved in Fe transport
+2806999548	protein export
+2806999584	D-galactonate
+2806999629	proton/sodium ion:glutamate/aspartate symporter
+2806999685	RND family efflux transporter MFP subunit
+2806999686	multidrug/solvent efflux (HAE1 subfamily)
+2806999687	multidrug/solvent efflux (HAE1 subfamily)
+2806999688	multidrug/solvent efflux (HAE1 subfamily)
+2806999689	multidrug/solvent efflux (HAE1 subfamily)
+2806999690	multidrug/solvent efflux (HAE1 subfamily)
+2806999698	sodium ion:dicarboxylate/sulfate
+2806999702	xanthine/uracil
+2806999711	proton (vacuolar)
+2806999717	Autoinducer-2 export
+2806999739	sugar efflux
+2806999798	rhamnose
+2806999876	drug/metabolite
+2806999904	arsenite (ArsB)
+2806999917	D-galactonate
+2806999929	cobalt/zinc/cadmium ion efflux (HME subfamily)
+2806999930	cobalt/zinc/cadmium ion efflux (HME subfamily)
+2806999947	sodium ion:proline symporter
+2806999948	metabolite (benzoate)
+2806999957	sugar
+2806999966	glycine betaine
+2806999970	oxalate:formate antiporter
+2807000090	drug/metabolite
+2807000091	multidrug efflux
+2807000102	lipoprotein
+2807000107	RND family efflux transporter MFP subunit
+2807000108	multidrug/solvent efflux (HAE1 subfamily)
+2807000116	outer membrane receptor protein involved in Fe transport
+2807000142	multidrug efflux
+2807000147	hemolysin C (HlyC) homolog
+2807000176	multidrug efflux
+2807000192	large neutral amino acid
+2807000195	unknown substrate
+2807000205	sodium ion:proline symporter
+2807000217	multidrug
+2807000245	unknown substrate
+2807000258	sodium ion:proline symporter
+2807000321	large-conductance mechanosensitive ion channel
+2807000361	lipid A
+2807000384	lipoprotein
+2807000385	unknown substrate
+2807000404	outer membrane receptor protein involved in Fe transport
+2807000456	efflux (antimicrobial peptide)
+2807000457	efflux (antimicrobial peptide)
+2807000496	60 KD inner membrane protein OxaA homolog
+2807000505	cobalt
+2807000519	D-galactonate
+2807000541	lipoprotein
+2807000563	sodium ion:proline symporter
+2807000593	arsenite (ArsA)
+2807000650	drug/metabolite
+2807000653	calcium ion/manganese ion
+2807000668	D-galactonate
+2807000680	D-galactonate
+2807000683	White pigment protein homolog (ABCG)
+2807000707	heme
+2807000723	polyamine
+2807000724	spermidine/putrescine
+2807000725	spermidine/putrescine
+2807000760	multidrug efflux
+2807000780	D-galactonate
+2807000808	lipid A
+2807000852	multidrug efflux
+2807000862	glycine betaine
+2807000878	daunorubicin
+2807000908	D-galactonate
+2807000937	multidrug efflux
+2807000938	sodium ion/
+2807001046	unknown substrate
+2807001065	sodium ion:proline symporter
+2807001070	amino acid
+2807001085	hemolysin C (HlyC) homolog
+2807001091	glycerol-3-phosphate
+2807001121	unknown substrate
+2807001131	multidrug
+2807001132	daunorubicin
+2807001152	lipoprotein
+2807001153	lipoprotein releasing
+2807001157	sodium ion:dicarboxylate/sulfate
+2807001172	proton:calcium ion antiporter
+2807001247	heme
+2807001264	iron-hydroxamate
+2807001265	cobalamin/Fe3+-siderophores
+2807001266	phosphonate
+2807001268	efflux (antimicrobial peptide)
+2807001284	ABC-type nitrate/sulfonate/bicarbonate transport system substrate-binding protein
+2807001285	nitrate/sulfonate/taurine
+2807001286	nitrate
+2807001314	multidrug efflux
+2807001322	cobalt/zinc/cadmium ion efflux (HME subfamily)
+2807001350	vacuolar iron uptake transporter homolog
+2807001365	thiamine
+2807001366	unknown substrate
+2807001378	magnesium ion
+2807001390	cobalt ion
+2807001393	cobalt ion
+2807001413	lipoprotein
+2807001414	lipoprotein releasing
+2807001422	drug/metabolite
+2807001449	multidrug efflux
+2807001470	sodium ion:proline symporter
+2807001477	potassium/sodium ion:proton antiporter
+2807001520	efflux (antimicrobial peptide)
+2807001530	ammonium
+2807001567	daunorubicin
+2807001579	polysaccharide export
+2807001614	sodium ion:proline symporter
+2807001619	lipid A
+2807001633	multidrug/solvent efflux (HAE1 subfamily)
+2807001646	oligopeptide
+2807001655	glycerol-3-phosphate
+2807001657	D-galactonate
+2807001668	L-lactate
+2807001681	multidrug
+2807001682	daunorubicin
+2807001707	sulfate
+2807001722	multidrug efflux
+2807001759	manganese/iron ion
+2807001765	ribose
+2807001798	RND family efflux transporter MFP subunit
+2807001799	multidrug/solvent efflux (HAE1 subfamily)
+2807001822	nickel ion
+2807001847	D-galactonate
+2807001848	small-conductance mechanosensitive ion channel
+2807001866	proton/sodium ion:glutamate/aspartate symporter
+2807001894	multidrug efflux
+2807001905	iron-hydroxamate
+2807001906	daunorubicin
+2807001907	cobalamin/Fe3+-siderophores
+2807001934	zinc/cadmium/cobalt ion
+2807001960	protons
+2807001961	protons
+2807001962	protons
+2807001963	protons
+2807001966	protons
+2807001993	cobalt/zinc/cadmium ion efflux (HME subfamily)
+2807002011	RND family efflux transporter MFP subunit
+2807002012	multidrug/solvent efflux (HAE1 subfamily)
+2807002015	sugar (ribose)
+2807002016	sugar (ribose)
+2807002036	arsenite (ArsA)
+2807002060	unknown substrate
+2807002061	unknown substrate
+2807002099	sulfate
+2807002124	lipoprotein releasing
+2807002125	lipoprotein
+2807002126	small-conductance mechanosensitive ion channel
+2807002132	Autoinducer-2 export
+2807002155	glycerol-3-phosphate
+2807002159	D-galactonate
+2807002196	nitrate/nitrite
+2807002201	unknown substrate
+2807002227	proton (vacuolar)
+2807002265	nitrate/nitrite
+2807002307	multidrug efflux
+2807002308	lipoprotein
+2807002316	unknown substrate
+2807002329	drug/metabolite
+2807002389	unknown substrate
+2807002390	daunorubicin
+2807002414	proton:dipeptide/tripeptide symporter
+2807002415	daunorubicin
+2807002420	toxin secretion
+2807002427	sodium ion:proline symporter
+2807002429	drug/metabolite
+2807002447	D-galactonate
+2807002493	zinc/cadmium/cobalt ion
+2807002494	multidrug
+2807002495	daunorubicin
+2807002496	unknown substrate
+2807002502	multidrug efflux
+2807002598	glycerol-3-phosphate
+2807002629	drug/metabolite
+2807002634	multidrug efflux
+2807002647	protein export
+2807002648	protein export
+2807002657	proton (vacuolar)
+2807002664	proton (vacuolar)
+2807002676	Autoinducer-2 export
+2807002699	potassium/sodium ion:proton antiporter
+2807002703	daunorubicin
+2807002727	Autoinducer-2 export
+2807002781	lipoprotein
+2807002782	lipoprotein releasing
+2807002825	multidrug efflux
+2807002834	heme
+2807002867	multidrug efflux
+2807002875	potassium ion channel
+2807002885	efflux (antimicrobial peptide)
+2807002888	protein export (SecDF)
+2807002890	outer membrane transport energization protein TonB 
+2807002891	unknown substrate
+2807002892	unknown substrate
+2807002893	biopolymer transport protein ExbD/TolR
+2807002894	biopolymer transport protein ExbD/TolR
+2807002940	rhamnose
+2807002951	drug/metabolite
+2807002978	sodium ion efflux
+2807002979	daunorubicin
+2807002983	drug/metabolite
+2807002991	daunorubicin
+2807002992	heme export
+2807002993	heme export
+2807002999	efflux (antimicrobial peptide)
+2807003000	lipoprotein
+2807003021	daunorubicin
+2807003023	daunorubicin
+2807003033	lipoprotein releasing
+2807003047	multidrug/quaternary ammonium compound efflux (SMR subfamily)
+2807003048	multidrug/quaternary ammonium compound efflux (SMR subfamily)
+2807003058	efflux (antimicrobial peptide)
+2807003059	efflux (antimicrobial peptide)
+2807003065	RND family efflux transporter MFP subunit
+2807003096	glycerol-3-phosphate
+2807003103	amino acid
+2807003139	spermidine/putrescine
+2807003232	D-methionine
+2807003233	dipeptide/oligopeptide
+2807003234	dipeptide/oligopeptide
+2807003235	dipeptide/oligopeptide
+2807003248	lipoprotein
+2807003263	spermidine/putrescine
+2807003291	lipoprotein releasing
+2807003292	lipoprotein
+2807003302	sodium ion:calcium ion antiporter
+2807003335	rhamnose
+2807003366	large neutral amino acid
+2807003367	amino acid
+2807003390	sodium ion:proline symporter
+2807003416	multidrug/solvent efflux (HAE1 subfamily)
+2807003431	zinc/cadmium/cobalt ion
+2807003436	potassium ion uptake
+2807003437	RND family efflux transporter MFP subunit
+2807003438	multidrug/solvent efflux (HAE1 subfamily)
+2807003460	cadmium ion
+2807003505	unknown substrate
+2807003526	sodium ion:proline symporter
+2807003571	amino acid
+2807003573	chromate ion
