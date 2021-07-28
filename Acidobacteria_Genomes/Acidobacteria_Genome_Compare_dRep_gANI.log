@@ -1,0 +1,21 @@
+nohup: ignoring input
+***************************************************
+    ..:: dRep compare Step 1. Cluster ::..
+***************************************************
+    
+Traceback (most recent call last):
+  File "/usr/bin/dRep", line 26, in <module>
+    controller.parseArguments(args)
+  File "/usr/lib/python3/dist-packages/drep/controller.py", line 146, in parseArguments
+    self.compare_operation(**vars(args))
+  File "/usr/lib/python3/dist-packages/drep/controller.py", line 91, in compare_operation
+    drep.d_workflows.compare_wrapper(kwargs['work_directory'],**kwargs)
+  File "/usr/lib/python3/dist-packages/drep/d_workflows.py", line 96, in compare_wrapper
+    drep.d_cluster.d_cluster_wrapper(wd, **kwargs)
+  File "/usr/lib/python3/dist-packages/drep/d_cluster.py", line 69, in d_cluster_wrapper
+    Bdb = _parse_cluster_arguments(workDirectory, **kwargs)
+  File "/usr/lib/python3/dist-packages/drep/d_cluster.py", line 360, in _parse_cluster_arguments
+    Bdb = load_genomes(kwargs['genomes'])
+  File "/usr/lib/python3/dist-packages/drep/d_cluster.py", line 1131, in load_genomes
+    assert os.path.isfile(genome), "{0} is not a file".format(genome)
+AssertionError: Acidobacteria_Genomes/*.fna is not a file

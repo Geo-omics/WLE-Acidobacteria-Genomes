@@ -1,0 +1,19 @@
+11-07 08:45 DEBUG    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+11-07 08:45 DEBUG    ***Logger started up at /geomicro/data22/smitdere/Erie2014_coAssembly/Acidobacteria_Genomes/Acidobacteria_Genomes_dRep_compare_gANI/log/logger.log***
+11-07 08:45 DEBUG    Command to run dRep was: /usr/bin/dRep compare -p 16 Acidobacteria_Genomes_dRep_compare_gANI/ -g Acidobacteria_Genomes/*.fna --S_algorithm gANI --SkipMash
+
+11-07 08:45 DEBUG    dRep version 2.0.5 was run 
+
+11-07 08:45 DEBUG    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+11-07 08:45 DEBUG    Namespace(MASH_sketch=1000, P_ani=0.9, S_algorithm='gANI', S_ani=0.99, SkipMash=True, SkipSecondary=False, cent_index=None, clusterAlg='average', cov_thresh=0.1, coverage_method='larger', debug=False, genomes=['Acidobacteria_Genomes/*.fna'], n_PRESET='normal', operation='compare', overwrite=False, percent='50', processors=16, run_tax=False, tax_method='percent', warn_aln=0.25, warn_dist=0.25, warn_sim=0.98, work_directory='Acidobacteria_Genomes_dRep_compare_gANI/')
+11-07 08:45 DEBUG    Starting the compare operation
+11-07 08:45 INFO     ***************************************************
+    ..:: dRep compare Step 1. Cluster ::..
+***************************************************
+    
+11-07 08:45 DEBUG    Loading work directory
+11-07 08:45 DEBUG    Located: /geomicro/data22/smitdere/Erie2014_coAssembly/Acidobacteria_Genomes/Acidobacteria_Genomes_dRep_compare_gANI
+Datatables: []
+Cluster files: []
+Arguments: []
