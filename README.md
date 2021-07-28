@@ -21,3 +21,5 @@ Microcystis_all.genes.fna contains all predicted gene sequences from Microcystis
 Blast_metaT_vs_Acido_Microcystis_combined_genes.sh contains a custom shell script used to map metatranscriptomic reads to predicted gene calls in the Acidobacteria MAGs and Microcystis references.
 
 batch_postblast.sh contains a custom shell script used to filter metatranscriptomic read alignments that do not pass minimum thresholds of percent identity and e-value.
+
+batch_top5.sh contains a custom shell script used to dereplicate read alignments (count each read once).
