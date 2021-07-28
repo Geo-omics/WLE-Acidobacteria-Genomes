@@ -81,3 +81,5 @@ The LE_H2O2_* files contain 16S rRNA V4 OTU information from a previously publis
 LE_H2O2.repseq.degapped.fasta contains the representative 16S rRNA V4 OTU sequences from https://github.com/Geo-omics/Characterizing-individual-Microcystis-colony-phycosphere-communities
 
 Acido_16S_vs_WLE_OTUs.blastn.postblast.txt shows the BLAST results of aligning the representative OTU sequences to the full-length 16S rRNA sequences from the MAGs.
+
+Bryobacter_CoA8_C33_genes_vs_nr.postblast.top1.NCBIaccessions.txt and Paludibaculum_CoA2_C42_genes_vs_nr.postblast.top1.NCBIaccessions.txt files contain the results of blasting the predicted protein sequences from each MAG to NCBI nr database. Contains only the best hit for each protein.
