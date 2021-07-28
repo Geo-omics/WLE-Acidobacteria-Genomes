@@ -67,3 +67,7 @@ sra_explorer_iu_gen_configs_input.txt contains information on how samples are pa
 batch_bbduk.sh was used to QC single-end sequencing datasets downloaded from NCBI.
 
 Acidobacteria_16S_blast_wrapper.sh and Cyanobacteria_16S_blast_wrapper.sh were used to map variable regions of amplicon reads to reference sequences.
+
+The Databasefiles folder contains the 16S rRNA gene references used to recruite variable region amplicon reads.
+
+sum_blast_hits.sh tallies the Amplicon reads mapped to 16S references.
