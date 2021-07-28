@@ -71,3 +71,7 @@ Acidobacteria_16S_blast_wrapper.sh and Cyanobacteria_16S_blast_wrapper.sh were u
 The Databasefiles folder contains the 16S rRNA gene references used to recruite variable region amplicon reads.
 
 sum_blast_hits.sh tallies the Amplicon reads mapped to 16S references.
+
+Summed_16S_hits_by_organism.txt is the output of sum_blast_hits.sh
+
+sra_metadata.txt contains the information about each sample downloaded from SRA.
