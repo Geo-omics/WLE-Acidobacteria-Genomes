@@ -76,4 +76,8 @@ Summed_16S_hits_by_organism.txt is the output of sum_blast_hits.sh
 
 sra_metadata.txt contains the information about each sample downloaded from SRA.
 
-The LE_H2O2_* files contain OTU information from a previously published study (https://github.com/Geo-omics/Characterizing-individual-Microcystis-colony-phycosphere-communities) to screen for Acidobacteria sequences.
+The LE_H2O2_* files contain 16S rRNA V4 OTU information from a previously published study (https://github.com/Geo-omics/Characterizing-individual-Microcystis-colony-phycosphere-communities) to screen for Acidobacteria sequences.
+
+LE_H2O2.repseq.degapped.fasta contains the representative 16S rRNA V4 OTU sequences from https://github.com/Geo-omics/Characterizing-individual-Microcystis-colony-phycosphere-communities
+
+Acido_16S_vs_WLE_OTUs.blastn.postblast.txt shows the BLAST results of aligning the representative OTU sequences to the full-length 16S rRNA sequences from the MAGs.
