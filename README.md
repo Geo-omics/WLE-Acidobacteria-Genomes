@@ -18,3 +18,5 @@ Bryobacter_CoA8_C33.fna contains the IMG predicted gene sequences from MAG CoA8_
 
 Microcystis_all.genes.fna contains all predicted gene sequences from Microcystis reference genomes obtained from IMG and NCBI. The included strains are Microcystis strain FD4, strain NIES 843, strain NIES 2481, strain NIES 2549, strain PCC7806SL.
 
+Blast_metaT_vs_Acido_Microcystis_combined_genes.sh contains a custom shell script used to map metatranscriptomic reads to predicted gene calls in the Acidobacteria MAGs and Microcystis references.
+
