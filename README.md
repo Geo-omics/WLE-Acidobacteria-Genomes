@@ -23,3 +23,6 @@ Blast_metaT_vs_Acido_Microcystis_combined_genes.sh contains a custom shell scrip
 batch_postblast.sh contains a custom shell script used to filter metatranscriptomic read alignments that do not pass minimum thresholds of percent identity and e-value.
 
 batch_top5.sh contains a custom shell script used to dereplicate read alignments (count each read once).
+
+Filter_out_short_alignments.sh removes read alignments with low query coverage in the center of genes.
+
