@@ -1,0 +1,1928 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This R script is for the analysis of data from Acidobacteria metatranscriptome gene mapping and gANI analysis.
+
+The Acidobacteria genomes of interest are two MAGs from coassemblies generated from shotgun data collected from 100 um size fraction
+metagenomes during the 2014 cyanobacterial bloom in western Lake Erie. Classified as Bryobacter and Paludibaculum based on their 16S rRNA gene sequences. They were found to have high catalase expression during beak bloom at station WE12; indeed they are largely responsible for the peak in catalase expression. We hypothesized that they are important scavengers of H2O2 and "helpers" for Microcystis. We are now examining how the genomes compare to other known Acidobacteria genomes. We also want to look at their gene expression for clues into their metabolism and how they could be interaction with Microcystis via metabolite exchanges.
+
+Note on axis / bar chart gene annotation legends, it can be unruly looking in R. We'll fix them in illustrator later.
+__________________________
+
+Lets start with how they compare to known Acidobacteria genomes.
+
+First, we need to download published Acidobacteria genomes from IMG and RefSeq to compare our genomes to.
+We got a total of 117 genomes from both databases. Some of the genomes from IMG are draft MAGs. They aren't closed and likely have portions of the genome missing and some contamination from other organisms. We want to be careful to only include high quality MAGs with very little contamination and high completeness to prevent drawing conclusions from incomplete or contaminated data, but I'm interested in inculding environmental sequences because in order to cover the breadth of diversity that is available of this Phylum.
+
+To check the quality of the genomes, we'll measure their completeness and contamination using CheckM (https://genome.cshlp.org/content/25/7/1043.short). This was done on the geomicro servers with the following unix command:
+```{bash}
+nohup checkm lineage_wf Acidobacteria_Genomes/ Published_Acidobacteria_Genomes_CheckM/ -f Published_Acidobacteria_Genomes_CheckM/Published_Acidobacteria_Genomes.checkm.bin_stats.tsv --tab_table -x fna -t 16 &> Published_Acidobacteria_Genomes_checkm.log &
+```
+
+the working directory was: /geomicro/data22/smitdere/Acidobacteria_Genome_Analysis/
+
+The output file we need is Published_Acidobacteria_Genomes.checkm.bin_stats.tsv. This is a data table of the genome completeness and contamination estimated from the number of single-copy marker genes in the genomes (see CheckM paper for details on what this means).
+We are only going to compare our MAGs to genomes with a completeness of 90% or greater and a contamination score 5% or less (rounding down). Now we'll add the genomes that pass this cutoff into the following working directory:
+
+/geomicro/data22/smitdere/Acidobacteria_Genome_Analysis/Acidobacteria_Genomes/
+
+Now we will compare the genomes using gANI. This compares the the average nucleotide identity of homologous open reading frames between the genomes in a pairwise manner. We will run this calculation in dRep using their "compare" function:
+
+```{bash}
+nohup dRep compare -p 16 Acidobacteria_Genomes_dRep_compare_gANI/ -g Acidobacteria_Genomes/*.fna --S_algorithm gANI --SkipMash &> Acidobacteria_Genome_Compare_dRep_gANI.log &
+```
+
+The --SkipMash flag skips dRep's preclustering step with Mash and compares the genomes only using gANI. This allows us to do all the pairwise comparisons possible with gANI rather than just between the genomes within each cluster formed by Mash.
+
+The result showed that a few genomes were excactly the same (despite having different names). This is probably because they had a more specific name in RefSeq than they did in IMG. To prevent having redundant comparisons, we removed the genomes from the dataset that had a duplicate, keeping the copy with the the lowest taxonomic rank in the name. Then we reran the above dRep command.
+
+The result is a data table named "Ndb.csv" containing each pairwise comparison, the fraction of the genomes that aligned, and the ANI of the portion that aligned.
+
+Let's download this file onto our personal computer and give it a more descriptive name, gANI_results.csv.
+
+We need to change the data frame into a matrix to creat a heatmap.
+For our purposes we need to have the genome query label for the rows and the genome reference for the columns and populate the matrix values with the gANI or alignment coverage score.
+
+This is easily done using python.
+First we will load the R libraries we need to use:
+```{r}
+library(reticulate)
+library(tibble)
+library(tidyr)
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(forcats)
+library(patchwork)
+library(reshape)
+library(maditr)
+setwd("/Volumes/T7/Research/2014_Erie_Bloom/Bins/Acidobacteria_Genomes/Acidobacteria_Genome_Analysis")
+```
+
+First, let's load the dataframe into R:
+```{r}
+gANI_results <- read.csv("gANI_results.csv")
+head(gANI_results)
+```
+
+There is a column for alignment coverage, gANI, the query genome, and the reference genome.
+
+gANI calculates ANI from aligned open reading frames (specifically from bidirectional best hits (BBHs)) and therefore is a measure of the similarity of homologous genes. gANI can be identicial between two pairwise comparisons, while the alignment fraction changes. Because we want to get an idea of how similar our new Acidobacteria MAGs are to the other genomes we will weight the gANI by the alignment fraction to get a total ANI value:
+
+gANI * AF = ANI total
+
+Proof:
+gANI = summed for each BBH (%ID * Alignment length) / lengths of BBH genes
+AF = lengths of BBH genes / total length of all ORFs in genome
+gANI * AF = summed for each BBH(%ID*Alignment length) / total length of all ORFs in genome
+
+Lets do that calculation for each pairwise comparison and populate the result into the dataframe:
+```{r}
+gANI_results$weighted_ani <- gANI_results$ani * gANI_results$alignment_coverage
+```
+
+The query and reference genome names also still have the file extensions in them, so lets remove those:
+```{r}
+gANI_results$querry <- gsub('.fna', '', gANI_results$querry)
+gANI_results$reference <- gsub('.fna', '', gANI_results$reference)
+```
+
+Let's also replace the underscores with spaces for the plot readability:
+```{r}
+gANI_results$querry <- gsub('_', ' ', gANI_results$querry)
+gANI_results$reference <- gsub('_', ' ', gANI_results$reference)
+head(gANI_results)
+```
+While looking through the data, I noticed that our MAGs of interest are still labeled as "Acidobacterium" rather than the more specific genus names obtained from the 16S rRNA gene match, so lets update those names now:
+```{r}
+gANI_results$querry <- replace(gANI_results$querry, gANI_results$querry=="Acidobacteria CoA2 BinC42", "Paludibaculum CoA2 BinC42")
+gANI_results$querry <- replace(gANI_results$querry, gANI_results$querry=="Acidobacteria CoA8 BinC33", "Bryobacter CoA8 BinC33")
+gANI_results$reference <- replace(gANI_results$reference, gANI_results$reference=="Acidobacteria CoA2 BinC42", "Paludibaculum CoA2 BinC42")
+gANI_results$reference <- replace(gANI_results$reference, gANI_results$reference=="Acidobacteria CoA8 BinC33", "Bryobacter CoA8 BinC33")
+```
+
+Remove some sequences that when looking for ribosomal proteins later in the analysis were missing from both IMG and NCBI:
+```{r}
+gANI_results <- gANI_results[gANI_results$querry != "Acidobacteria BinDmb228",]
+gANI_results <- gANI_results[gANI_results$querry != "Acidobacterium strain J13",]
+gANI_results <- gANI_results[gANI_results$reference != "Acidobacteria BinDmb228",]
+gANI_results <- gANI_results[gANI_results$reference != "Acidobacterium strain J13",]
+gANI_results <- gANI_results[gANI_results$querry != "Moorea producens heterotroph coculture Ga0081188",]
+gANI_results <- gANI_results[gANI_results$reference != "Moorea producens heterotroph coculture Ga0081188",]
+```
+
+
+Next we will import our necessary python packages and import our updated data frame as a python object:
+```{python}
+import pandas as pds
+import seaborn as sns
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+gANI_results = r.gANI_results
+gANI_results.info()
+```
+
+Use pivot table function to arrange the data in a matrix with the desired format:
+The index argument references the desired row variable
+The columns argument references the desired column variable
+The values argument references the data
+```{python}
+matrix = gANI_results.pivot_table(index='querry', columns='reference', values='weighted_ani')
+matrix
+```
+
+Both the ANI and alignment coverage is expressed as a fraction so the values range from 0 to 1.0. The closer the ANI is to 1, the more similar the genomes are to each other. An ANI of 1 indicates that the genomes are exactly the same.
+
+Make a heatmap of ANI
+```{python}
+#Set the plot size and scale the font
+fig, ax = plt.subplots(figsize=(45,45))
+sns.set(font_scale=3.0)
+#Plot
+sns.heatmap(matrix, cmap='coolwarm', linecolor='black', linewidths=0.2, xticklabels=True, yticklabels=True, ax=ax, cbar_kws={'label': 'ANI'})
+```
+
+This plot is probably overkill because really we are only interested in the how the public genomes compare to our MAGs and not each other. Lets make a scatter plot of AF and gANI of all the comparisons made to each MAG.
+
+First lets do Paludibaculum:
+
+We only want the entries in gANI_results that have our Paludibaculum MAG as the querry, so lets parse that information out into a smaller dataframe:
+```{r}
+gANI_Paludibaculum <- gANI_results[gANI_results$querry == "Paludibaculum CoA2 BinC42",]
+gANI_Paludibaculum <- gANI_Paludibaculum[gANI_Paludibaculum$reference != "Paludibaculum CoA2 BinC42",] #remove the self comparison
+gANI_Paludibaculum <- gANI_Paludibaculum[gANI_Paludibaculum$reference != "Moorea producens heterotroph coculture Ga0081187",] #remove the genome with AF of 0
+```
+
+Plot gANI:
+```{r}
+gANI_plot_Palud <- ggplot(gANI_Paludibaculum, aes(y=alignment_coverage, x=ani)) +
+    geom_point(size = 2, alpha =0.7) +
+    geom_text(aes(label=reference), hjust=-0.05, size=7 / .pt) +
+    theme_classic() +
+    theme(plot.background = element_rect(color = "NA"),
+          axis.line.x = element_line(size=0.1),
+          axis.line.y = element_line(size=0.1),
+          axis.text.y = element_text(size = 12 / .pt, color = "black", margin = margin(t = 0, r = 5, b = 0, l = 0)),
+          axis.title.y = element_text(size = 14 / .pt, color = "black", margin = margin(t = 0, r = 5, b = 0, l = 0)),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          axis.title.x = element_text(size = 14 / .pt, color = "black", margin = margin(t = 5, r = 0, b = 0, l = 0)),
+          axis.text.x = element_text(size = 12 / .pt, color = "black", margin = margin(t = 5, r = 0, b = 0, l = 0)),
+          axis.ticks.length = unit(-0.1, "cm"),
+          axis.ticks = element_line(size=0.1)) +
+    coord_cartesian(ylim=c(0,1), xlim=c(0.6,1)) +
+    xlab("gANI") +
+    ylab("Alignment Coverage")
+
+gANI_plot_Palud
+ggsave("Paludibaculum_gANI.pdf", gANI_plot_Palud, width = 85, height = 85, units = "mm")
+```
+The most similar genome to Paludibaculum is Acidobacteria Bin 45 Ga0077553 with an AF of 0.66 and ANI ~0.81. It was a MAG assembled from an Ann Arbor drinking water filter dataset. The next most similar genoems are the Bryobacter and Solibacter isolates, which makes sense given the phylogenetic placement of Paludibaculum. Overall, the genome is pretty novel, the weighted ANI of the most similar genome is only 0.55. Safe to say we have discovered a new species of Paludibaculum.
+
+Now let's look at the pairwise comparisons to the Bryobacter MAG.
+First set up the dataframe like we did for Paludibaculum:
+```{r}
+gANI_Bryobacter <- gANI_results[gANI_results$querry == "Bryobacter CoA8 BinC33",]
+gANI_Bryobacter <- gANI_Bryobacter[gANI_Bryobacter$reference != "Bryobacter CoA8 BinC33",] #remove the self comparison
+gANI_Bryobacter <- gANI_Bryobacter[gANI_Bryobacter$reference != "Moorea producens heterotroph coculture Ga0081187",] #remove the genome with AF of 0
+```
+
+Plot Bryobacter gANI:  
+```{r}
+gANI_plot_Bryo <- ggplot(gANI_Bryobacter, aes(y=alignment_coverage, x=ani)) +
+    geom_point(size = 2, alpha =0.7) +
+    geom_text(aes(label=reference), hjust=-0.05, size=7 / .pt) +
+    theme_classic() +
+    theme(plot.background = element_rect(color = "NA"),
+          axis.line.x = element_line(size=0.1),
+          axis.line.y = element_line(size=0.1),
+          axis.text.y = element_text(size = 12 / .pt, color = "black", margin = margin(t = 0, r = 5, b = 0, l = 0)),
+          axis.title.y = element_text(size = 14 / .pt, color = "black", margin = margin(t = 0, r = 5, b = 0, l = 0)),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          axis.title.x = element_text(size = 14 / .pt, color = "black", margin = margin(t = 5, r = 0, b = 0, l = 0)),
+          axis.text.x = element_text(size = 12 / .pt, color = "black", margin = margin(t = 5, r = 0, b = 0, l = 0)),
+          axis.ticks.length = unit(-0.1, "cm"),
+          axis.ticks = element_line(size=0.1)) +
+    coord_cartesian(ylim=c(0,1), xlim=c(0.6,1)) +
+    xlab("gANI") +
+    ylab("Alignment Coverage")
+
+gANI_plot_Bryo
+ggsave("Bryobacter_gANI.pdf", gANI_plot_Bryo, width = 85, height = 85, units = "mm")
+```
+
+As expected it is most similar to the Bryobacter aggregatus strains, followed by our Paludibaculum MAG and the MAG from Ann Arbor drinking water. Interestingly, the ANI between Bryobacter sp. and its closest relatives is more dissimilar than the ANI between Paludibaculum and its next closest genome. It's also dissimilar from the public genomes, the heighest weighted ANI for the Bryobacter MAG is ~0.31. That's a pretty low ANI for a comparison within the same genus, although not outside the realm of possibilites (see some of Konstantinidis's papers).
+
+The next step is to confirm the phylogenetic placement of the bins and compare their similar based on marker gene phylogenies and sequence divergence.
+
+We can make a maximum-likihood tree in RAxML on the geomicro servers, with Ribosomal Protein L18. First we have to download these sequences.
+
+It was annotated in 47/50 of the genomes in IMG. Exported using the gene cart.
+Missing gene in both Chloracidobacterium thermophilum genomes and the Geothrix sp. GB2 genome.
+
+Searching for them in NCIB entries. Found one in Chloracidobacterium thermophilum B chromosome 1 but not for the other genomes.
+Pasted it into the file with the sequences from IMG.
+
+Now we need to get the ribosomal protein sequence from the Acidobacteria in RefSeq/NCBI that weren't in IMG.
+Those genomes are:
+Acidipila 4G-K13
+Acidobacteria Bin Dmb228
+Acidisarcina polymorpha SBC82
+Acidobacteriaceae strain J13 
+Bryobacter aggregatus MPL3 (this one was identical to the other strain with ANI so we can ignore it)
+Candidatus Sulfotelmatobacter kueseliae
+Candidatus Sulfotelmatomonas gaucii
+Moorea producens heterotroph coculture Ga0081188 (ignore this one because the AF was 0)
+Occallatibacter savannae AB23
+Silvibacterium bohemicum S15
+Terracidiphilus gabretensis S55
+
+--Acidobacteria Bin Dmb228, Acidobacteriaceae strain J13, and Moorea producens heterotroh coculture Ga0081187  were missing from both IMG and NCBI. Not including in this analysis and will remove from ANI analysis.
+
+--We also got a Geobacter metallreducans sequence to serve as the root of the tree.
+
+Remove all the spaces, colons, and commas in the sequence names for RAXML, replacing them with underscores before moving forward.
+
+```{bash}
+##the working directory is /geomicro/data22/smitdere/Acidobacteria_Genome_Analysis/gene_trees/
+nohup comics clustalo -i Acidobacteria_RP_L18.fna -t DNA -o Acidobacteria_RP_L18_aligned.fna --outfmt=fasta -v -l Acidobacteria_RP_L18_clustalo.log &
+```
+
+Next, we will build the maximum likihood tree of the aligned RP L18 genes with raxml:
+```{bash}
+#workding directory: /geomicro/data22/smitdere/Acidobacteria_Genome_Analysis/gene_trees/
+nohup raxmlHPC -f a -x 48108 -p 00156 -# autoMRE -m GTRGAMMA -s Acidobacteria_RP_L18_aligned.fna -n raxml_RPL18 &> raxml_RPL18.log &
+```
+
+Now align the 16S rRNA genes for maximum likelihood analysis:
+```{bash}
+#workding directory: /geomicro/data22/smitdere/Acidobacteria_Genome_Analysis/gene_trees/
+nohup comics clustalo -i Acidobacteria_16S_rRNA.fasta -t DNA -o Acidobacteria_16S_rRNA_aligned.fasta --outfmt=fasta -v -l Acidobacteria_16S_rRNA_clustalo.log &
+```
+
+RaxmL for 16S:
+```{bash}
+#workding directory: /geomicro/data22/smitdere/Acidobacteria_Genome_Analysis/gene_trees/
+nohup raxmlHPC -f a -x 48108 -p 00156 -# autoMRE -m GTRGAMMA -s Acidobacteria_16S_rRNA_aligned.fasta -n raxml_16S &> raxml_16S.log &
+```
+
+Raxml found duplicate sequences in the 16S rRNA gene alignment. Convienently, the program gives you a reduced file of only unique sequences so we can remake the tree with that file.
+
+The analysis bootstrapping also didn't converge with the maximum number of iterations for autoMRE (1000). So let's rerun the analysis with double the number of iterations (since the analysis took less than an hour the first time this should be ok).
+
+The commandline looks like this for the rerun of the 16S maximum likelihood analysis:
+```{bash}
+#workding directory: /geomicro/data22/smitdere/Acidobacteria_Genome_Analysis/gene_trees/
+nohup raxmlHPC -f a -x 48108 -p 00156 -# 2000 -m GTRGAMMA -s Acidobacteria_16S_rRNA_aligned.fasta.reduced -n raxml_16S &> raxml_16S.log &
+```
+
+Because we specified a number of bootstraps to run, we have to test that the bootstraps converged post priori:
+```{bash}
+#workding directory: /geomicro/data22/smitdere/Acidobacteria_Genome_Analysis/gene_trees/
+nohup raxmlHPC -m GTRGAMMA -z RAxML_bootstrap.raxml_16S -I autoMRE -n raxml_16S_postpriori -p 00156 &> raxml_16S_postpriori_autoMRE.log &
+```
+
+The 16S tree converged after 1350 iterations, so we can move forward with the data we have now.
+
+We can look at the results of the two trees in figtree. The file to load is the RAxML_bipartitions.* file.
+
+For the Ribosomal Protein tree, the tree topology doesn't match published phylogenies. There must be a problem with the alignment or one of the sequences or the substitution model that we used.
+
+The 16S rRNA tree matches published phylogenies. The 16S rRNA sequences from the MAGs cluster as expected from the blast results. Branch lengths aren't very long.
+
+It might be better to construct the ribosomal protein phylogeny with protein sequences instead of nucleotide sequences. Going to try that next.
+Just a quick test by running blastn and blastx against NCBI nr, using the Geobacter and Chloracidobacterium RP L18 sequences as querries.
+The DNA blast had high percent identiy but only 5-10% alignment coverage to other acidobacteria. Conversely the protein sequences had 50-60% identity but alignment coverages of 95% of the gene length.
+
+Downloading the protein sequences from IMG and NCBI and uploading to the geomicro server. (Same working directory as the above phylogenetic analysis)
+
+Align the protein sequences in clustalo:
+```{bash}
+#workding directory: /geomicro/data22/smitdere/Acidobacteria_Genome_Analysis/gene_trees/
+nohup comics clustalo -i Acidobacteria_RP_L18.faa -t Protein -o Acidobacteria_RP_L18_aligned.faa --outfmt=fasta -v -l Acidobacteria_RP_L18_protein_clustalo.log &
+```
+
+Next do the maximum likelihood analysis on the protein alignment:
+```{bash}
+#workding directory: /geomicro/data22/smitdere/Acidobacteria_Genome_Analysis/gene_trees/
+nohup raxmlHPC -f a -x 48108 -p 33446 -# 2000 -m PROTGAMMAAUTO -s Acidobacteria_RP_L18_aligned.faa -n raxml_RP_L18_prot &> raxml_RP_L18_prot.log &
+```
+
+Test that the bootstrap trees converged post priori:
+```{bash}
+nohup raxmlHPC -m PROTGAMMAAUTO -z RAxML_bootstrap.raxml_RP_L18_prot -I autoMRE -n raxml_RP_L18_prot_postpriori -p 00156 &> raxml_RP_L18_prot_postpriori_autoMRE.log &
+```
+
+The new ribosomal protein tree matches what we expect from previous phylogenies and the 16S rRNA gene tree.
+There might be slightly different clustering of Acidiphila (not monophyletic in the ribosomal protien tree). But overall it seems to support the placement of our acidobacteria MAGs.
+
+--------------------------
+
+The next step is to look at the gene expression of these organisms. Especially in relationship to what 
+Microcystis is taking up or producing.
+
+We are going to map metatranscriptomic reads to the gene calls of both MAGs as well as some Microcystis reference genomes (done on geomicro servers):
+To prevent weird mapping patterns I'm going to cluster the homologous genes between the Microcystis references using vsearch.
+Clustered at 95% identitiy and using the longest sequence as the centroid (or the representative of the cluster).
+
+```{bash}
+#working directory is /geomicro/data22/smitdere/Acidobacteria_Genome_Analysis/metaT_mapping/metaT_mapping_gene_blasts/
+nohup vsearch --cluster_fast Microcystis_all.genes.fna --centroids Microcystis_genes_clustered.fasta --id 0.95 -iddef 4 --uc Microcystis_genes_cleaned_cluster_results.txt &> vsearch_Microcystis_genes.log &
+```
+
+The gene sequences and gene call coordinates for the Acidobacteria MAGs were downloaded from JGI IMG.
+
+Combined all the gene sequences into one file to map competitively:
+```{bash}
+#working directory is /geomicro/data22/smitdere/Acidobacteria_Genome_Analysis/metaT_mapping/metaT_mapping_gene_blasts/
+cat Bryobacter_CoA8_C33.genes.fna Paludibaculum_CoA2_C42.genes.simple_headers.fna Microcystis_genes_clustered.fasta > Bryobacter_Paludibaculum_Microcystis.combined_genes.fna
+```
+
+Create a custom blast database from the combined genes file:
+```{bash}
+#working directory is /geomicro/data22/smitdere/Acidobacteria_Genome_Analysis/metaT_mapping/metaT_mapping_gene_blasts/
+makeblastdb -in Bryobacter_Paludibaculum_Microcystis.combined_genes.fna -dbtype nucl -logfile Bryobacter_Paludibaculum_Microcystis.combined_genes.dblog
+```
+
+Before we can blast the transcript reads to the genes we need to reformat the fastq read files into fasta format for blast:
+```{bash}
+#Working directory for the command is /geomicro/data22/smitdere/Metatranscriptomes/Sample_50632/
+comics -- nohup fastq_to_fasta -n -v -i Sample_50632_adtrim_clean_qtrim_fwd.fastq -o Sample_50632_adtrim_clean_qtrim_fwd.fasta &> Sample_50632_fastq_to_fasta.log &
+
+##Note this is an example command for one sample. The other samples were run the same way, but replace the sample numbers for the working directory and file names to match those for the other samples.
+#Sample numbers are 50632, 53185, 53187, 53189, 53191, 53193
+```
+
+Made softlinks to the read files so that they can be called in the working directory with the gene files and blast database:
+```{bash}
+#here is an example:
+ln -s /geomicro/data22/smitdere/Metatranscriptomes/Sample_53189/Sample_53189_adtrim_clean_qtrim_fwd.fasta
+```
+
+Blast to the reads using a custom shell script:
+```{bash}
+#working directory is /geomicro/data22/smitdere/Acidobacteria_Genome_Analysis/metaT_mapping/metaT_mapping_gene_blasts/
+nohup bash Blast_metaT_vs_Acido_Microcystis_combined_genes.sh &> Blast_metaT_vs_Acido_Microcystis_combined_genes.log &
+```
+
+Used one of Sunit's shell scripts to remove all hits below 95% identity and e-value above 1e-5, used a custom shell script wrapper to call the script for all samples:
+```{bash}
+#working directory is /geomicro/data22/smitdere/Acidobacteria_Genome_Analysis/metaT_mapping/metaT_mapping_gene_blasts/
+nohup bash batch_postblast.sh &> batch_postblast.log &
+```
+
+Next, filter out all hits but the top hit for each querry (read). Do this so that we don't double count reads.
+Again used one of Sunit's scripts for this, called inside a custom shell wrapper to iterativly hit all samples:
+```{bash}
+#working directory is /geomicro/data22/smitdere/Acidobacteria_Genome_Analysis/metaT_mapping/metaT_mapping_gene_blasts/
+nohup bash batch_top5.sh &> batch_top5.log &
+```
+
+Result of all of these steps is a file for each sample that has all the best matches that each read had to each of the genes from Bryobacter, Paludibaculum, and 5 Microcystis strains in blast's output format.
+
+The filename structure is Sample_*_adtrim_clean_qtrim_fwd.fasta_vs_combined_genes.blastn.postblast.txt.postblast.top_hits.txt. 
+Here, "*" is a place holder for the sample ID numbers.
+
+We got rid of matches with low % ID scores already but we still need to remove hits with very short sequence alignments.
+Do that with this custom script:
+```{bash}
+#working directory is /geomicro/data22/smitdere/Acidobacteria_Genome_Analysis/metaT_mapping/metaT_mapping_gene_blasts/
+nohup bash Filter_out_short_alignments.sh &> Filter_out_short_alignments.log &
+```
+
+Inside the script is a simple awk loop.
+
+The logic is: if the coverage of the read is greater or equal to 80, write that blast entry to a new file that has the same name as the input file but with the added extension ".QCd". Otherwise don't write the entry, unless the start or end position of the read's alignment is at the start or end of the gene's location. This allows us to count reads that may have been generated in at the ends of a gene and avoid some edge effects.
+
+So now we have a cleaned blast output file for each sample. However the blast output format is not the best for our purposes. What we need is a data table of the number of reads that mapped to each gene along with some metadata on the predicted function of the gene and what organism it came from.
+
+First lets get our gene metadata organized into one data file.
+IMG provides a gff file which contains each gene id and it's predicted function. There is a lot of extra stuff that we don't need, but we can convert this file into a simple matrix containing the gene ID, functional annotation, and the genome it came from.
+Did this using BBedit's regrex search and editing functions.
+
+Append a column to each file that lists the genome that the gene came from.
+```{bash}
+sed -E -i '' $'s/$/\tBryobacter_CoA8_C33/' Bryobacter_CoA8_C33_annotations.txt
+sed -E -i '' $'s/$/\tPaludibaculum_CoA2_C42/' Paludibaculum_CoA2_C42_annotations.txt
+sed -E -i '' $'s/$/\tMicrocystis_NIES_2481/' Microcystis_NIES_2481_annotations.txt
+sed -E -i '' $'s/$/\tMicrocystis_NIES_2549/' Microcystis_NIES_2549_annotations.txt
+sed -E -i '' $'s/$/\tMicrocystis_PCC_7806SL/' Microcystis_PCC_7806SL_annotations.txt
+sed -E -i '' $'s/$/\tMicrocystis_NIES_843/' Microcystis_NIES_843_annotations.txt
+```
+
+Need to manually change the new column's header to a header rather than the column value.
+
+Combine everything into one file for parsing data later:
+```{bash}
+cat *_annotations.txt > Combined_genes_annotations.txt
+```
+
+Realized that the headers will be a problem for parsing later, so removed them in BBedit.
+The way the file is pasted together with cat attaches the beginning of the file to the end of the line of the last file. Need to manually make the new entries start on the next line.
+
+Run this custom bash script in the geomicro servers to tally all the hits mapped to each gene and report it in a dataframe along with the gene's length and the genome it came from:
+```{bash}
+#working directory is: /geomicro/data22/smitdere/Acidobacteria_Genome_Analysis/metaT_mapping/metaT_mapping_gene_blasts/
+nohup bash get_read_counts_combined_genes.sh &> get_read_counts_combined_genes.log &
+```
+
+The bash script ran from 10-17-19 to be terminated on 10/29/2019
+
+The parsing script above was running very slow so rewrote with Robert's help to try and parallelize it:
+```{bash}
+#working directory: /geomicro/data22/smitdere/Acidobacteria_Genome_Analysis/metaT_mapping/metaT_mapping_gene_blasts/
+nohup bash get_read_counts_combined_genes_parallelized.sh &> get_read_counts_combined_genes_parallelized.log &
+```
+
+Parallelized parsing script finished before the previous script could even finish one sample. Finished by 10/29/2019, possibly earlier.
+Download the read count files onto personal laptop to continue data analysis in R:
+Load the data into a workable format into R:
+```{r}
+#Load each dataframe and label columns:
+Sample_50632_metaT <- read.table("Prl_Read_counts_Sample_50632_adtrim_clean_qtrim_fwd.fasta_vs_combined_genes.blastn.postblast.txt.top_hits.txt.QCd", sep = "\t")
+colnames(Sample_50632_metaT) <- c("Gene", "Sample_50632_read_count", "Gene_Length", "Genome")
+Sample_53185_metaT <- read.table("Prl_Read_counts_Sample_53185_adtrim_clean_qtrim_fwd.fasta_vs_combined_genes.blastn.postblast.txt.top_hits.txt.QCd", sep = "\t")
+colnames(Sample_53185_metaT) <- c("Gene", "Sample_53185_read_count", "Gene_Length", "Genome")
+Sample_53187_metaT <- read.table("Prl_Read_counts_Sample_53187_adtrim_clean_qtrim_fwd.fasta_vs_combined_genes.blastn.postblast.txt.top_hits.txt.QCd", sep = "\t")
+colnames(Sample_53187_metaT) <- c("Gene", "Sample_53187_read_count", "Gene_Length", "Genome")
+Sample_53189_metaT <- read.table("Prl_Read_counts_Sample_53189_adtrim_clean_qtrim_fwd.fasta_vs_combined_genes.blastn.postblast.txt.top_hits.txt.QCd", sep = "\t")
+colnames(Sample_53189_metaT) <- c("Gene", "Sample_53189_read_count", "Gene_Length", "Genome")
+Sample_53191_metaT <- read.table("Prl_Read_counts_Sample_53191_adtrim_clean_qtrim_fwd.fasta_vs_combined_genes.blastn.postblast.txt.top_hits.txt.QCd", sep = "\t")
+colnames(Sample_53191_metaT) <- c("Gene", "Sample_53191_read_count", "Gene_Length", "Genome")
+Sample_53193_metaT <- read.table("Prl_Read_counts_Sample_53193_adtrim_clean_qtrim_fwd.fasta_vs_combined_genes.blastn.postblast.txt.top_hits.txt.QCd", sep = "\t")
+colnames(Sample_53193_metaT) <- c("Gene", "Sample_53193_read_count", "Gene_Length", "Genome")
+Sample_53195_metaT <- read.table("Prl_Read_counts_Sample_53195_adtrim_clean_qtrim_fwd.fasta_vs_combined_genes.blastn.postblast.txt.top_hits.txt.QCd", sep = "\t")
+colnames(Sample_53195_metaT) <- c("Gene", "Sample_53195_read_count", "Gene_Length", "Genome")
+#Combine the dataframes by gene ID and genome name.
+dfs <- list(
+  Sample_50632_metaT,
+  Sample_53185_metaT,
+  Sample_53187_metaT,
+  Sample_53189_metaT,
+  Sample_53191_metaT,
+  Sample_53193_metaT,
+  Sample_53195_metaT
+)
+
+Combined_counts_metaT <- join_all(dfs, by=c("Gene", "Genome"))
+
+#The gene lengths show up as NaNs for samples were no reads mapped to the gene (because the gene length was stored in the blast output files), which prevents merging the Gene Lengths.
+#Remove the gene length columns so we can add in one single column containing all the gene lengths
+drop <- c("Gene_Length")
+Combined_counts_metaT <- Combined_counts_metaT[, !(names(Combined_counts_metaT) %in% drop)]
+```
+
+Create a datatable of all the gene entries with their listed gene lengths:
+```{bash}
+awk -F "\t" '{print $1 "\t" $3}' Prl_Read_counts_Sample_5* > Combined_MetaT_Gene_Lengths.txt
+```
+
+Load into R and remove all the rows where Gene Length is empty, then make unique:
+```{r}
+#Load data
+Gene_Lengths <- read.table("Combined_MetaT_Gene_Lengths.txt", sep="\t")
+#Set column names
+colnames(Gene_Lengths) <- c("Gene", "Gene_length")
+#Remove NAs
+Gene_Lengths <- Gene_Lengths[!(is.na(Gene_Lengths$Gene_length)),]
+#Make unique
+Gene_Lengths <- unique(Gene_Lengths, incomparables = FALSE)
+```
+
+The result is a datatable with fewer entries than the number of genes mapped to the dataset. This must be from genes that never had any hits in the dataset at any sample, so the gene length would always be listed as "NA".
+
+Merge the gene length data table with the combined read count data table:  
+```{r}
+Combined_counts_metaT <- merge(Combined_counts_metaT, Gene_Lengths, by = "Gene", all = TRUE)
+#Indeed we have all Gene Length NAs appearing whereever a Gene had 0 counts for all samples
+#Remove genes that have zero counts in all samples:
+Combined_counts_metaT <- Combined_counts_metaT[!(is.na(Combined_counts_metaT$Gene_length)), ]
+```
+
+Next we need the functional annotations for each gene in the dataframe:  
+```{r}
+#Import data table of functional annotations for each gene
+Gene_functional_annotations <- read.table("Combined_gene_annotations.txt", sep="\t", header = FALSE)
+#Add in column names
+colnames(Gene_functional_annotations) <- c("Gene", "Annotation", "Genome")
+#Merge the data frame with our read counts data frame
+Combined_counts_metaT <- merge(Combined_counts_metaT, Gene_functional_annotations, by = c("Gene", "Genome"), all.x = TRUE, all.y = FALSE)
+```
+
+Next we need to normalize the read counts by gene length. We do this because longer genes will recruit more reads than shorter reads, independent of their ecological or biological significance.  
+```{r}
+#Normalize each read_counts column by the gene length
+Combined_counts_metaT[,12:18] <- Combined_counts_metaT[,3:9] / ( Combined_counts_metaT[,10] / 1000 )
+
+#Replace Microcystis strain IDs with just Microcystis for grouping
+Combined_counts_metaT$Genome <- gsub("Microcystis_.*", "Microcystis", Combined_counts_metaT$Genome)
+
+#Fix new column headers
+ Combined_counts_metaT <- Combined_counts_metaT %>%
+   rename(c(Sample_50632_read_count.1 = "Sample_50632_norm_len")) %>%
+   rename(c(Sample_53185_read_count.1 = "Sample_53185_norm_len")) %>%
+   rename(c(Sample_53187_read_count.1 = "Sample_53187_norm_len")) %>%
+   rename(c(Sample_53189_read_count.1 = "Sample_53189_norm_len")) %>%
+   rename(c(Sample_53191_read_count.1 = "Sample_53191_norm_len")) %>%
+   rename(c(Sample_53193_read_count.1 = "Sample_53193_norm_len")) %>%
+   rename(c(Sample_53195_read_count.1 = "Sample_53195_norm_len"))
+
+#Set blank fields as NA:
+Combined_counts_metaT[Combined_counts_metaT==""] <- NA
+
+#Remove rRNA genes (entries where the annotation field is blank):
+Combined_counts_metaT <- Combined_counts_metaT[ !(is.na(Combined_counts_metaT$Annotation)), ]
+
+#Separate out the data by organism
+Bryobacter_counts_metaT <- Combined_counts_metaT[ Combined_counts_metaT$Genome == "Bryobacter_CoA8_C33", ]
+Microcystis_counts_metaT <- Combined_counts_metaT[ Combined_counts_metaT$Genome == "Microcystis", ]
+Paludibaculum_counts_metaT <- Combined_counts_metaT[ Combined_counts_metaT$Genome == "Paludibaculum_CoA2_C42", ]
+```
+
+Now normalize by total reads in each sample that mapped to each (pan)genome to get RPKM numbers, which corrects for varying sequencing effort across the samples:  
+```{r}
+#Bryobacter:
+Bryobacter_counts_metaT$Sample_50632_RPKM <- Bryobacter_counts_metaT$Sample_50632_norm_len / sum(Bryobacter_counts_metaT$Sample_50632_read_count) * 1000000
+Bryobacter_counts_metaT$Sample_53185_RPKM <- Bryobacter_counts_metaT$Sample_53185_norm_len / sum(Bryobacter_counts_metaT$Sample_53185_read_count) * 1000000
+Bryobacter_counts_metaT$Sample_53187_RPKM <- Bryobacter_counts_metaT$Sample_53187_norm_len / sum(Bryobacter_counts_metaT$Sample_53187_read_count) * 1000000
+Bryobacter_counts_metaT$Sample_53189_RPKM <- Bryobacter_counts_metaT$Sample_53189_norm_len / sum(Bryobacter_counts_metaT$Sample_53189_read_count) * 1000000
+Bryobacter_counts_metaT$Sample_53191_RPKM <- Bryobacter_counts_metaT$Sample_53191_norm_len / sum(Bryobacter_counts_metaT$Sample_53191_read_count) * 1000000
+Bryobacter_counts_metaT$Sample_53193_RPKM <- Bryobacter_counts_metaT$Sample_53193_norm_len / sum(Bryobacter_counts_metaT$Sample_53193_read_count) * 1000000
+Bryobacter_counts_metaT$Sample_53195_RPKM <- Bryobacter_counts_metaT$Sample_53195_norm_len / sum(Bryobacter_counts_metaT$Sample_53195_read_count) * 1000000
+
+#Microcystis:
+Microcystis_counts_metaT$Sample_50632_RPKM <- Microcystis_counts_metaT$Sample_50632_norm_len / sum(Microcystis_counts_metaT$Sample_50632_read_count) * 1000000
+Microcystis_counts_metaT$Sample_53185_RPKM <- Microcystis_counts_metaT$Sample_53185_norm_len / sum(Microcystis_counts_metaT$Sample_53185_read_count) * 1000000
+Microcystis_counts_metaT$Sample_53187_RPKM <- Microcystis_counts_metaT$Sample_53187_norm_len / sum(Microcystis_counts_metaT$Sample_53187_read_count) * 1000000
+Microcystis_counts_metaT$Sample_53189_RPKM <- Microcystis_counts_metaT$Sample_53189_norm_len / sum(Microcystis_counts_metaT$Sample_53189_read_count) * 1000000
+Microcystis_counts_metaT$Sample_53191_RPKM <- Microcystis_counts_metaT$Sample_53191_norm_len / sum(Microcystis_counts_metaT$Sample_53191_read_count) * 1000000
+Microcystis_counts_metaT$Sample_53193_RPKM <- Microcystis_counts_metaT$Sample_53193_norm_len / sum(Microcystis_counts_metaT$Sample_53193_read_count) * 1000000
+Microcystis_counts_metaT$Sample_53195_RPKM <- Microcystis_counts_metaT$Sample_53195_norm_len / sum(Microcystis_counts_metaT$Sample_53195_read_count) * 1000000
+
+#Paludibaculum:
+Paludibaculum_counts_metaT$Sample_50632_RPKM <- Paludibaculum_counts_metaT$Sample_50632_norm_len / sum(Paludibaculum_counts_metaT$Sample_50632_read_count) * 1000000
+Paludibaculum_counts_metaT$Sample_53185_RPKM <- Paludibaculum_counts_metaT$Sample_53185_norm_len / sum(Paludibaculum_counts_metaT$Sample_53185_read_count) * 1000000
+Paludibaculum_counts_metaT$Sample_53187_RPKM <- Paludibaculum_counts_metaT$Sample_53187_norm_len / sum(Paludibaculum_counts_metaT$Sample_53187_read_count) * 1000000
+Paludibaculum_counts_metaT$Sample_53189_RPKM <- Paludibaculum_counts_metaT$Sample_53189_norm_len / sum(Paludibaculum_counts_metaT$Sample_53189_read_count) * 1000000
+Paludibaculum_counts_metaT$Sample_53191_RPKM <- Paludibaculum_counts_metaT$Sample_53191_norm_len / sum(Paludibaculum_counts_metaT$Sample_53191_read_count) * 1000000
+Paludibaculum_counts_metaT$Sample_53193_RPKM <- Paludibaculum_counts_metaT$Sample_53193_norm_len / sum(Paludibaculum_counts_metaT$Sample_53193_read_count) * 1000000
+Paludibaculum_counts_metaT$Sample_53195_RPKM <- Paludibaculum_counts_metaT$Sample_53195_norm_len / sum(Paludibaculum_counts_metaT$Sample_53195_read_count) * 1000000
+
+```
+
+Plot the total amount of reads mapped to each genome in all samples:
+```{r}
+#Make a dataframe of total reads mapped:
+#Sum the read counts in each column (sample)
+Total_reads_vector <- c(
+  sum(Paludibaculum_counts_metaT$Sample_50632_read_count),
+  sum(Paludibaculum_counts_metaT$Sample_53185_read_count),
+  sum(Paludibaculum_counts_metaT$Sample_53187_read_count),
+  sum(Paludibaculum_counts_metaT$Sample_53189_read_count),
+  sum(Paludibaculum_counts_metaT$Sample_53191_read_count),
+  sum(Paludibaculum_counts_metaT$Sample_53193_read_count),
+  sum(Paludibaculum_counts_metaT$Sample_53195_read_count),
+  sum(Bryobacter_counts_metaT$Sample_50632_read_count),
+  sum(Bryobacter_counts_metaT$Sample_53185_read_count),
+  sum(Bryobacter_counts_metaT$Sample_53187_read_count),
+  sum(Bryobacter_counts_metaT$Sample_53189_read_count),
+  sum(Bryobacter_counts_metaT$Sample_53191_read_count),
+  sum(Bryobacter_counts_metaT$Sample_53193_read_count),
+  sum(Bryobacter_counts_metaT$Sample_53195_read_count))
+
+#Fill in the genome taxonomy
+Genome_vector <- c("Acidobacterium CoA2 C42", "Acidobacterium CoA2 C42", "Acidobacterium CoA2 C42", "Acidobacterium CoA2 C42", "Acidobacterium CoA2 C42", "Acidobacterium CoA2 C42", "Acidobacterium CoA2 C42", "Bryobacter CoA8 C33", "Bryobacter CoA8 C33", "Bryobacter CoA8 C33", "Bryobacter CoA8 C33", "Bryobacter CoA8 C33", "Bryobacter CoA8 C33", "Bryobacter CoA8 C33")
+
+#Fill in the dates each sample was collected
+Date_vector <- c("WE12, 4-Aug", "WE2, 21-Jul", "WE4, 29-Jul", "WE12, 25-Aug", "WE4, 8-Sep", "WE12, 23-Sep", "WE2, 6-Oct", "WE12, 4-Aug", "WE2, 21-Jul", "WE4, 29-Jul", "WE12, 25-Aug", "WE4, 8-Sep", "WE12, 23-Sep", "WE2, 6-Oct")
+
+#Create a dataframe from these vectors.
+total_reads_df <- data.frame("Total_reads" = Total_reads_vector, "Genome" = Genome_vector, "Sample" = Date_vector)
+```
+
+Make a barplot showing how many reads mapped to each genome:
+```{r}
+#Sort the samples by date:
+total_reads_df$Sample <- factor(total_reads_df$Sample,levels = c("WE2, 21-Jul", "WE4, 29-Jul", "WE12, 4-Aug", "WE12, 25-Aug", "WE4, 8-Sep", "WE12, 23-Sep", "WE2, 6-Oct"))
+
+total_reads_plot <- ggplot(total_reads_df, aes(x=Sample, y=Total_reads, fill=Genome)) + 
+  geom_bar(position="dodge", stat="identity") +
+  theme_classic() +
+  theme(plot.background = element_rect(color = "NA"),
+      strip.background = element_blank(),
+      panel.spacing = unit(5, "mm"),
+      axis.line.x = element_line(size=0.1),
+      axis.line.y = element_line(size=0.1),
+      axis.text.x = element_text(size = 20 / .pt, color = "black", angle = 45, hjust = 1, margin = margin(t = 6, r = 0, b = 0, l = 0)),
+      axis.title.x = element_blank(),
+      panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+      axis.title.y = element_text(size = 20 / .pt, color = "black", margin = margin(t = 0, r = 8, b = 0, l = 0)),
+      axis.text.y = element_text(size = 18 / .pt, color = "black", margin = margin(t = 0, r = 6, b = 0, l = 0)),
+      axis.ticks.length = unit(-0.1, "cm"),
+      axis.ticks = element_line(size=0.1),
+      legend.title = element_blank(),
+      legend.position = "top") +
+    coord_cartesian(ylim=c(0,1200000)) +
+    ylab("Reads mapped")
+
+total_reads_plot
+ggsave("total_reads_plot.pdf", total_reads_plot, width = 85, height = 85, units = "mm", dpi=300)
+
+```
+There are only enough reads that mapped to the Acidobacterium CoA2 C42 in the Aug-4-2014 sample from station WE12, so we will focus on look at the relative abundance of genes in this sample.  
+
+Make a ranked abundance plot of gene expression in Paludibaculum for peak bloom (Sample 50632):
+```{r}
+Palud_top50_genes <- Paludibaculum_counts_metaT %>%
+  arrange(desc(Sample_50632_RPKM)) %>%
+  slice(1:50) %>% #Only show the 50 most abundant genes in the metatranscriptome
+  ggplot(., aes(y=reorder(Gene, Sample_50632_RPKM), x=Sample_50632_RPKM, width=0.75)) +
+    geom_bar(stat="identity", position = position_dodge()) +
+    geom_text(aes(label=Annotation), hjust=-0.05, size=3 / .pt) +
+    theme_classic() +
+    theme(plot.background = element_rect(color = "NA"),
+          axis.line.x = element_line(size=0.1),
+          axis.line.y = element_line(size=0.1),
+          axis.text.y = element_blank(),
+          axis.title.y = element_blank(),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          axis.title.x = element_text(size = 10 / .pt, color = "black", margin = margin(t = 5, r = 0, b = 0, l = 0)),
+          axis.text.x = element_text(size = 8 / .pt, color = "black", margin = margin(t = 5, r = 0, b = 0, l = 0)),
+          axis.ticks.length.x = unit(-0.1, "cm"),
+          axis.ticks = element_line(size=0.1)) +
+    coord_cartesian(xlim=c(0,30000)) +
+    xlab("Relative Abundance (RPKM)") +
+    ylab("GeneID")
+
+Palud_top50_genes
+ggsave("Paludibaculum_Top50_genes_metaT.pdf", Palud_top50_genes, width = 85, height = 85, units = "mm", dpi=300)
+```
+
+Lets make a ranked abundance plot of the transporters for Paludibaculum:
+```{r}
+#Load in transporterDB annotations:
+Paludibaculum_transporterDB <- read.table("Paludibaculum_Transporters.txt", header = TRUE, sep="\t")
+
+#Add the read count data to the transporters:
+Paludibaculum_transporter_counts_metaT <- merge(Paludibaculum_counts_metaT, Paludibaculum_transporterDB, by = c("Gene"), all = FALSE)
+
+#Plot
+Palud_Top50_Transporters <- Paludibaculum_transporter_counts_metaT %>%
+  arrange(desc(Sample_50632_RPKM)) %>%
+  slice(1:50) %>% #Only show the 50 most abundant transporter genes in the metatranscriptome
+  ggplot(., aes(y=reorder(Gene, Sample_50632_RPKM), x=Sample_50632_RPKM, width=0.75)) +
+  geom_bar(stat="identity", position = position_dodge()) +
+    geom_text(aes(label=Annotation), hjust=-0.05, size=3 / .pt) +
+    theme_classic() +
+    theme(plot.background = element_rect(color = "NA"),
+          axis.line.x = element_line(size=0.1),
+          axis.line.y = element_line(size=0.1),
+          axis.text.y = element_blank(),
+          axis.title.y = element_blank(),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          axis.title.x = element_text(size = 10 / .pt, color = "black", margin = margin(t = 5, r = 0, b = 0, l = 0)),
+          axis.text.x = element_text(size = 8 / .pt, color = "black", margin = margin(t = 5, r = 0, b = 0, l = 0)),
+          axis.ticks.length.x = unit(-0.1, "cm"),
+          axis.ticks = element_line(size=0.1)) +
+    coord_cartesian(xlim=c(0,3000)) +
+    xlab("Relative Abundance (RPKM)") +
+    ylab("GeneID")
+
+Palud_Top50_Transporters
+ggsave("Paludibaculum_Top50_Transporters_metaT.pdf", Palud_Top50_Transporters, width = 85, height = 85, units = "mm", dpi=300)
+```
+What are the top 50 most abundant Bryobacter genes in the metatranscriptome:  
+```{r}
+#make a vector of gene annotations to be excluded in the plot
+drop <- c("16S", "23S", "5S")
+
+#Plot
+#We only want protein coding genes, so remove the rRNA genes.
+Bryo_top50_genes <- Bryobacter_counts_metaT %>% filter(!(Annotation %in% drop)) %>%
+  arrange(desc(Sample_50632_RPKM)) %>% #Sort by decreasing relative abundance
+  slice(1:50) %>% #Only show the 50 most abundant genes in the metatranscriptome
+  ggplot(., aes(y=reorder(Gene, Sample_50632_RPKM), x=Sample_50632_RPKM, width=0.75)) +
+    geom_bar(stat="identity", position = position_dodge()) +
+    geom_text(aes(label=Annotation), hjust=-0.05, size=3 / .pt) +
+    theme_classic() +
+    theme(plot.background = element_rect(color = "NA"),
+          axis.line.x = element_line(size=0.1),
+          axis.line.y = element_line(size=0.1),
+          axis.text.y = element_blank(),
+          axis.title.y = element_blank(),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          axis.title.x = element_text(size = 10 / .pt, color = "black", margin = margin(t = 5, r = 0, b = 0, l = 0)),
+          axis.text.x = element_text(size = 8 / .pt, color = "black", margin = margin(t = 5, r = 0, b = 0, l = 0)),
+          axis.ticks.length.x = unit(-0.1, "cm"),
+          axis.ticks = element_line(size=0.1)) +
+    coord_cartesian(xlim=c(0,20000)) +
+    xlab("Relative Abundance (RPKM)") +
+    ylab("GeneID")
+
+Bryo_top50_genes
+ggsave("Bryobacter_Top50_genes_metaT.pdf", Bryo_top50_genes, width = 85, height = 85, units = "mm", dpi=300)
+```
+What is the relative abundance of Bryobacter transporters in the metatranscriptome?  
+```{r}
+#Load in transporterDB annotations:
+Bryobacter_transporterDB <- read.table("Bryobacter_transporters.txt", header = TRUE, sep="\t")
+
+#Add the read count data to the transporters:
+Bryobacter_transporter_counts_metaT <- merge(Bryobacter_counts_metaT, Bryobacter_transporterDB, by = c("Gene"), all = FALSE)
+
+#Plot
+Bryo_Top50_Transporters <- Bryobacter_transporter_counts_metaT %>%
+  arrange(desc(Sample_50632_RPKM)) %>%
+  slice(1:50) %>% #Only show the 50 most abundant transporter genes in the metatranscriptome
+  ggplot(., aes(y=reorder(Gene, Sample_50632_RPKM), x=Sample_50632_RPKM, width=0.75)) +
+  geom_bar(stat="identity", position = position_dodge()) +
+    geom_text(aes(label=Annotation), hjust=-0.05, size=3 / .pt) +
+    theme_classic() +
+    theme(plot.background = element_rect(color = "NA"),
+          axis.line.x = element_line(size=0.1),
+          axis.line.y = element_line(size=0.1),
+          axis.text.y = element_blank(),
+          axis.title.y = element_blank(),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          axis.title.x = element_text(size = 10 / .pt, color = "black", margin = margin(t = 5, r = 0, b = 0, l = 0)),
+          axis.text.x = element_text(size = 8 / .pt, color = "black", margin = margin(t = 5, r = 0, b = 0, l = 0)),
+          axis.ticks.length.x = unit(-0.1, "cm"),
+          axis.ticks = element_line(size=0.1)) +
+    xlab("Relative Abundance (RPKM)") +
+    ylab("GeneID")
+
+Bryo_Top50_Transporters
+ggsave("Bryo_Top50_Transporters_metaT.pdf", Bryo_Top50_Transporters, width = 85, height = 85, dpi=300, units = "mm")
+```
+Plot RPKM of glycolate oxidase genes in Bryobacter:  
+```{r}
+#Vector of the genes annotated as glycolate oxidases:
+Bryobacter_GOX_genes <- c("2807004469", "2807006320", "2807006321", "2807007944", "2807004416", "2807005948", "2807005979", "2807006635", "2807003695")
+
+#Plot
+Bryobacter_4_Aug_GOX_plot <- filter(Bryobacter_counts_metaT, Gene %in% Bryobacter_GOX_genes) %>%
+  ggplot(aes(y=Sample_50632_RPKM, x=as.factor(Gene))) +
+  geom_bar(stat="identity", position = position_dodge()) +
+    theme_classic() +
+    ggtitle("4-Aug-2014") +
+    theme(plot.background = element_rect(color = "NA"),
+          title = element_text(size = 18 / .pt, color = "black", margin = margin(t = 0, r = 0, b = 6, l = 0)),
+          axis.line.x = element_line(size=0.1),
+          axis.line.y = element_line(size=0.1),
+          axis.text.x = element_blank(),
+          axis.title.x = element_blank(),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          axis.title.y = element_text(size = 18 / .pt, color = "black", margin = margin(t = 0, r = 8, b = 0, l = 0)),
+          axis.text.y = element_text(size = 16 / .pt, color = "black", margin = margin(t = 0, r = 6, b = 0, l = 0)),
+          axis.ticks.length = unit(-0.1, "cm"),
+          axis.ticks = element_line(size=0.1)) +
+    coord_cartesian(ylim=c(0,200)) +
+    ylab("Relative Abundance (RPKM)")
+
+Bryobacter_25_Aug_GOX_plot <- filter(Bryobacter_counts_metaT, Gene %in% Bryobacter_GOX_genes) %>%
+  ggplot(aes(y=Sample_53189_RPKM, as.factor(Gene))) +
+  geom_bar(stat="identity", position = position_dodge()) +
+    theme_classic() +
+    ggtitle("25-Aug-2014") +
+    theme(plot.background = element_rect(color = "NA"),
+          title = element_text(size = 18 / .pt, color = "black", margin = margin(t = 0, r = 0, b = 6, l = 0)),
+          axis.line.x = element_line(size=0.1),
+          axis.line.y = element_line(size=0.1),
+          axis.text.x = element_text(size = 18 / .pt, color = "black", angle=45, hjust=1, margin = margin(t = 6, r = 0, b = 0, l = 0)),
+          axis.title.x = element_blank(),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          axis.title.y = element_text(size = 18 / .pt, color = "black", margin = margin(t = 0, r = 8, b = 0, l = 0)),
+          axis.text.y = element_text(size = 16 / .pt, color = "black", margin = margin(t = 0, r = 6, b = 0, l = 0)),
+          axis.ticks.length = unit(-0.1, "cm"),
+          axis.ticks = element_line(size=0.1)) +
+    coord_cartesian(ylim=c(0,200)) +
+    ylab("Relative Abundance (RPKM)")
+
+Bryobacter_GOX_plot <- Bryobacter_4_Aug_GOX_plot / Bryobacter_25_Aug_GOX_plot
+Bryobacter_GOX_plot
+ggsave("Bryobacter_GOX_plot.pdf", Bryobacter_GOX_plot, width = 85, height = 100, dpi=300, units = "mm")
+```
+Plot RPKM of glycolate oxidase genes in Acidobacterium CoA2 C42:
+```{r}
+#Vector of glycolate oxidase annotated genes:
+Palud_GOX_genes <- c("2807002270", "2807002963", "2807000326", "2807000836", "2807001724", "2807001725", "2807001761", "2807002795", "2807000375", "2807000729")
+
+#Plot
+Palud_4_Aug_GOX_plot <- filter(Paludibaculum_counts_metaT, Gene %in% Palud_GOX_genes) %>%
+  ggplot(aes(y=Sample_50632_RPKM, as.factor(Gene))) +
+  geom_bar(stat="identity", position = position_dodge()) +
+    theme_classic() +
+    ggtitle("4-Aug-2014") +
+    theme(plot.background = element_rect(color = "NA"),
+          title = element_text(size = 18 / .pt, color = "black", margin = margin(t = 0, r = 0, b = 6, l = 0)),
+          axis.line.x = element_line(size=0.1),
+          axis.line.y = element_line(size=0.1),
+          axis.text.x = element_blank(),
+          axis.title.x = element_blank(),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          axis.title.y = element_text(size = 18 / .pt, color = "black", margin = margin(t = 0, r = 8, b = 0, l = 0)),
+          axis.text.y = element_text(size = 16 / .pt, color = "black", margin = margin(t = 0, r = 6, b = 0, l = 0)),
+          axis.ticks.length = unit(-0.1, "cm"),
+          axis.ticks = element_line(size=0.1)) +
+    coord_cartesian(ylim=c(0,400)) +
+    ylab("Relative Abundance (RPKM)")
+
+Palud_25_Aug_GOX_plot <- filter(Paludibaculum_counts_metaT, Gene %in% Palud_GOX_genes) %>%
+  ggplot(aes(y=Sample_53189_RPKM, as.factor(Gene))) +
+  geom_bar(stat="identity", position = position_dodge()) +
+    theme_classic() +
+    ggtitle("25-Aug-2014") +
+    theme(plot.background = element_rect(color = "NA"),
+          title = element_text(size = 18 / .pt, color = "black", margin = margin(t = 0, r = 0, b = 6, l = 0)),
+          axis.line.x = element_line(size=0.1),
+          axis.line.y = element_line(size=0.1),
+          axis.text.x = element_text(size = 18 / .pt, color = "black", angle=45, hjust=1, margin = margin(t = 6, r = 0, b = 0, l = 0)),
+          axis.title.x = element_blank(),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          axis.title.y = element_text(size = 18 / .pt, color = "black", margin = margin(t = 0, r = 8, b = 0, l = 0)),
+          axis.text.y = element_text(size = 16 / .pt, color = "black", margin = margin(t = 0, r = 6, b = 0, l = 0)),
+          axis.ticks.length = unit(-0.1, "cm"),
+          axis.ticks = element_line(size=0.1)) +
+    coord_cartesian(ylim=c(0,800)) +
+    ylab("Relative Abundance (RPKM)")
+
+Palud_GOX_plot <- Palud_4_Aug_GOX_plot / Palud_25_Aug_GOX_plot
+Palud_GOX_plot
+ggsave("Palud_GOX_plot.pdf", Palud_GOX_plot, width = 85, height = 100, dpi=300, units = "mm")
+```
+Plot expression of B12 transporters, B12-dependent enzymes, and B12 salvaging pathways in Bryobacter:
+```{r}
+#Create a vector of B12 transporters and tonB proteins in Bryobacter:
+Bryobacter_B12_transporters <- c("2807004138", "2807004916", "2807004923", "2807005536", "2807006507", "2807007822", "2807006716", "2807003657")
+
+#Plot
+Bryobacter_B12_transporter_plot <- filter(Bryobacter_counts_metaT, Gene %in% Bryobacter_B12_transporters) %>%
+  ggplot(aes(y=Sample_50632_RPKM, x=as.factor(Gene))) +
+  geom_bar(stat="identity", position = position_dodge()) +
+    theme_classic() +
+    ggtitle("Bryobacter") +
+    theme(plot.background = element_rect(color = "NA"),
+          title = element_text(size = 20 / .pt, color = "black", margin = margin(t = 0, r = 0, b = 6, l = 0)),
+          axis.line.x = element_line(size=0.1),
+          axis.line.y = element_line(size=0.1),
+          axis.text.x = element_text(size = 18 / .pt, color = "black", angle = 45, hjust=1, margin = margin(t = 6, r = 0, b = 0, l = 0)),
+          axis.title.x = element_blank(),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          axis.title.y = element_text(size = 20 / .pt, color = "black", margin = margin(t = 0, r = 8, b = 0, l = 0)),
+          axis.text.y = element_text(size = 18 / .pt, color = "black", margin = margin(t = 0, r = 6, b = 0, l = 0)),
+          axis.ticks.length = unit(-0.1, "cm"),
+          axis.ticks = element_line(size=0.1)) +
+    coord_cartesian(ylim=c(0,800)) +
+    ylab("Relative Abundance (RPKM)")
+
+Bryobacter_B12_transporter_plot
+ggsave("Bryobacter_B12_transporter_plot.pdf", Bryobacter_B12_transporter_plot, width = 85, height = 85, dpi=300, units = "mm")
+```
+
+Plot expression of B12 scavenging and remodelling genes in Bryobacter:
+```{r}
+#Vector of B12 remodelling genes:
+Bryobacter_B12_genes <- c("2807007175", "2807004194", "2807005784", "2807005782", "2807005783")
+
+#Plot
+Bryobacter_B12_plot <- filter(Bryobacter_counts_metaT, Gene %in% Bryobacter_B12_genes) %>%
+  ggplot(aes(y=Sample_50632_RPKM, x=as.factor(Gene))) +
+  geom_bar(stat="identity", position = position_dodge()) +
+    theme_classic() +
+    ggtitle("Bryobacter") +
+    theme(plot.background = element_rect(color = "NA"),
+          title = element_text(size = 20 / .pt, color = "black", margin = margin(t = 0, r = 0, b = 6, l = 0)),
+          axis.line.x = element_line(size=0.1),
+          axis.line.y = element_line(size=0.1),
+          axis.text.x = element_text(size = 18 / .pt, color = "black", angle = 45, hjust=1, margin = margin(t = 6, r = 0, b = 0, l = 0)),
+          axis.title.x = element_blank(),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          axis.title.y = element_text(size = 20 / .pt, color = "black", margin = margin(t = 0, r = 8, b = 0, l = 0)),
+          axis.text.y = element_text(size = 18 / .pt, color = "black", margin = margin(t = 0, r = 6, b = 0, l = 0)),
+          axis.ticks.length = unit(-0.1, "cm"),
+          axis.ticks = element_line(size=0.1)) +
+    coord_cartesian(ylim=c(0,300)) +
+    ylab("Relative Abundance (RPKM)")
+
+Bryobacter_B12_plot
+ggsave("Bryobacter_B12_plot.pdf", Bryobacter_B12_plot, width = 85, height = 85, dpi=300, units = "mm")
+```
+So we have some evidence that Bryobacter is actively taking up cobalamin and can remodel the axial ligands. Does it have any genes that require B12 to function.
+
+I looked in the gene annotations for the following genes:  
+metH (B12-dependent methionine synthase)
+metE (a B12-independent variant of the above)
+nrdJ (B12-dependent ribonucleoside-diphosphate reductase)
+nrdA and nrdB (B12-independent alternatives to nrdJ)
+D-ornithine aminomutase (another B12 dependent enyzme)
+
+Genome CoA2 C42 has metH, metE, nrdA, and nrdB. Bryobacter has metH, metE, nrdJ.
+
+Plot the abundance of the Bryobacter genes in the August 4th metatranscriptome:  
+```{r}
+#Create a vector of B12-dependent genes to subset the data with:
+Bryobacter_B12_dependent_genes <- c("2807003957", "2807004934", "2807004531")
+
+#Plot
+Bryobacter_B12_dependent_genes_plot <- filter(Bryobacter_counts_metaT, Gene %in% Bryobacter_B12_dependent_genes) %>%
+  ggplot(aes(y=Sample_50632_RPKM, x=as.factor(Gene))) +
+  geom_bar(stat="identity", position = position_dodge()) +
+    theme_classic() +
+    ggtitle("Bryobacter") +
+    theme(plot.background = element_rect(color = "NA"),
+          title = element_text(size = 20 / .pt, color = "black", margin = margin(t = 0, r = 0, b = 6, l = 0)),
+          axis.line.x = element_line(size=0.1),
+          axis.line.y = element_line(size=0.1),
+          axis.text.x = element_text(size = 18 / .pt, color = "black", angle = 45, hjust=1, margin = margin(t = 6, r = 0, b = 0, l = 0)),
+          axis.title.x = element_blank(),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          axis.title.y = element_text(size = 20 / .pt, color = "black", margin = margin(t = 0, r = 8, b = 0, l = 0)),
+          axis.text.y = element_text(size = 18 / .pt, color = "black", margin = margin(t = 0, r = 6, b = 0, l = 0)),
+          axis.ticks.length = unit(-0.1, "cm"),
+          axis.ticks = element_line(size=0.1)) +
+    ylab("Relative Abundance (RPKM)")
+
+Bryobacter_B12_dependent_genes_plot
+ggsave("Bryobacter_B12_dependent_genes_plot.pdf", Bryobacter_B12_dependent_genes_plot, width = 85, height = 85, dpi=300, units = "mm")
+```
+
+Plot B12 expression data in Microcystis for peak bloom:  
+```{r}
+#Extract the genes with annotations involved in B12 biosynthesis:
+Microcystis_B12_genes <- Microcystis_counts_metaT[ 
+  Microcystis_counts_metaT$Gene == "2645934231" | Microcystis_counts_metaT$Gene == "2645935800" | Microcystis_counts_metaT$Gene == "2645936348" | Microcystis_counts_metaT$Gene == "2645935816" | Microcystis_counts_metaT$Gene == "2645936130" | Microcystis_counts_metaT$Gene == "2753711586" | Microcystis_counts_metaT$Gene == "641538218" |  Microcystis_counts_metaT$Gene == "2645934577" | Microcystis_counts_metaT$Gene == "2883439476" | Microcystis_counts_metaT$Gene == "2722757950" | Microcystis_counts_metaT$Gene == "2753712584" | Microcystis_counts_metaT$Gene == "2883438124" | Microcystis_counts_metaT$Gene == "2645932528" | Microcystis_counts_metaT$Gene == "2883437316" | Microcystis_counts_metaT$Gene == "2753711840" | Microcystis_counts_metaT$Gene == "2645935814" | Microcystis_counts_metaT$Gene == "2645936135" | Microcystis_counts_metaT$Gene == "2883438030" | Microcystis_counts_metaT$Gene == "2883438660" | Microcystis_counts_metaT$Gene == "2753711587" | Microcystis_counts_metaT$Gene == "2645932845" | Microcystis_counts_metaT$Gene == "2753714861" | Microcystis_counts_metaT$Gene == "2645935375" | Microcystis_counts_metaT$Gene == "2883440181"| Microcystis_counts_metaT$Gene == "2645935447" | Microcystis_counts_metaT$Gene == "2645935952" | Microcystis_counts_metaT$Gene == "641535695" | Microcystis_counts_metaT$Gene == "641538282" | Microcystis_counts_metaT$Gene == "641538283" | Microcystis_counts_metaT$Gene == "641538124" | Microcystis_counts_metaT$Gene == "2883440493" | Microcystis_counts_metaT$Gene == "2645934137" | Microcystis_counts_metaT$Gene == "2883437805" | Microcystis_counts_metaT$Gene == "2645936257" | Microcystis_counts_metaT$Gene == "2883438271" | Microcystis_counts_metaT$Gene == "2645933940" | Microcystis_counts_metaT$Gene == "2883436699", ]
+
+#Rename some annotations so that the text matches exactly for grouping purposes:
+Microcystis_B12_genes$Annotation <- gsub('adenosylcobinamide kinase / adenosylcobinamide-phosphate guanylyltransferase', 'adenosylcobinamide-phosphate guanylyltransferase', Microcystis_B12_genes$Annotation)
+
+Microcystis_B12_genes$Annotation <- gsub('adenosylcobinamide kinase/adenosylcobinamide-phosphate guanylyltransferase', 'adenosylcobinamide-phosphate guanylyltransferase', Microcystis_B12_genes$Annotation)
+
+Microcystis_B12_genes$Annotation <- gsub('cobaltochelatase CobN', 'cobaltochelatase', Microcystis_B12_genes$Annotation)
+
+Microcystis_B12_genes$Annotation <- gsub('cobalamin biosynthesis Mg chelatase CobN', 'cobaltochelatase', Microcystis_B12_genes$Annotation)
+
+Microcystis_B12_genes$Annotation <- gsub('L-threonine.*', 'L-threonine-O-3-phosphate decarboxylase', Microcystis_B12_genes$Annotation)
+
+Microcystis_B12_genes$Annotation <- gsub('.*cobaltochelatase.*', 'cobaltochelatase', Microcystis_B12_genes$Annotation)
+
+Microcystis_B12_genes$Annotation <- gsub('precorrin-3 methyltransferase.*', 'precorrin-3 methyltransferase', Microcystis_B12_genes$Annotation)
+
+#Sum the RPKM by gene annotation in the August 4th sample:
+Microcystis_B12_genes_summed <- Microcystis_B12_genes %>%
+  group_by(Annotation) %>%
+  summarize(RPKM_50632=sum(Sample_50632_RPKM))
+
+#Plot RPKM of each gene class in peak bloom metaT (4th August):
+Microcystis_B12_genes_plot <- ggplot(Microcystis_B12_genes_summed, aes(x=RPKM_50632, y=Annotation)) +
+  geom_bar(stat="identity", position = position_dodge(width=1)) +
+    theme_classic() +
+    theme(plot.background = element_rect(color = "NA"),
+          title = element_text(size = 20 / .pt, color = "black", margin = margin(t = 0, r = 0, b = 6, l = 0)),
+          axis.line.x = element_line(size=0.1),
+          axis.line.y = element_line(size=0.1),
+          axis.text.x = element_text(size = 20 / .pt, color = "black", angle = 45, hjust=1, margin = margin(t = 6, r = 0, b = 0, l = 0)),
+          axis.title.y = element_blank(),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          axis.title.x = element_text(size = 20 / .pt, color = "black", margin = margin(t = 8, r = 0, b = 0, l = 0)),
+          axis.text.y = element_text(size = 20 / .pt, color = "black", margin = margin(t = 0, r = 6, b = 0, l = 0)),
+          axis.ticks.length = unit(-0.1, "cm"),
+          axis.ticks = element_line(size=0.1)) +
+    xlim(0,150) +
+    xlab("Relative Abundance (RPKM)")
+
+Microcystis_B12_genes_plot
+ggsave("Microcystis_B12_genes_plot.pdf", Microcystis_B12_genes_plot, width = 110, height = 85, dpi=300, units = "mm")
+```
+There is detectable expression of B12 biosynthesis genes by Microcystis during the bloom.
+
+Lets compare to a later sample to see how the expression changes and if it might be related to absence of Paludibaculum:
+
+Ran the Paludibaculum gene calls through a full feature antismash analysis (version 5.0.0):
+```{bash}
+#working directory is /geomicro/data22/smitdere/Acidobacteria_Genome_Analysis/
+nohup antismash --cb-general --cb-knownclusters --cb-subclusters --asf --pfam2go --smcog-trees Bin_folder_METABOLIC/Paludibaculum_CoA2_C42.fasta --genefinding-gff3 Paludibaculum_CoA2_C42.gff &> Paludibaculum_CoA2_C42_antismash.log &
+```
+
+Another interesting result was that Paludibaculum lacks the entire pathway to synthesize vitamin B12. Does it get this vitamin from Microcystis?
+
+Some cyanos are known to produce Vitamin B12, excrete it, and most have the genes for synthesizing the corin ring. See Helliwell et al (https://www.sciencedirect.com/science/article/pii/S0960982216301233), Heal et al (https://www.pnas.org/content/114/2/364.short), and Bonnet et al (https://aslopubs.onlinelibrary.wiley.com/doi/abs/10.4319/lo.2010.55.5.1959)
+
+Took the protein sequences for the B12 biosynthetic genes in Synechococcus WH 8102 and Crocosphaera watsonii WH 8501 and blasted them against the Microycstis 7806 protein sequences from IMG.
+
+```{bash}
+#First make the database file:
+makeblastdb -in Crocosphaera_Synechococcus_B12_genes.faa -dbtype prot -logfile Crocosphaera_Synechococcus_B12_genes.dblog
+#Run the blast:
+nohup blastp -query Microcystis_PCC_7806SL.genes.faa -db Crocosphaera_Synechococcus_B12_genes.faa -outfmt "7 std qlen slen qcovs" -out Microcystis_PCC7806_B12.blastp &> Microcystis_PCC_7806SL_B12_blastp.log &
+#Filter out hits with an e-value higher than 1e-5 and and a bit score less than 50:
+perl /geomicro/data1/COMMON/scripts/BlastTools/postBlast.pl -b Microcystis_PCC7806_B12.blastp -s 50 -e 1e-5 -o Microcystis_PCC7806_B12.blastp.postblast.txt
+```
+
+There's also expresson of genes involved in glycolate oxidation, and a pathway for incorporation of glycolate into biomass and energy production from a marine microbe was recently confirmed biochemically (see von Borzyskowski et al. (2019). Nature)
+
+Took the amino acid sequences from the paper and made a blast database, then blast those genes against the annotated and translated genes from our Paludibaculum genome:
+```{bash}
+#wd: /geomicro/data22/smitdere/Acidobacteria_Genome_Analysis/
+nohup blastp -query Paludibaculum_CoA2_C42_simple_headers.genes.faa -db P_denitrificans_glycolate_util_genes.faa -out Paludibaculum_glycolate_proteins.blastp -outfmt "7 std qlen slen qcovs" &> Paludibaculum_glycolate_proteins.blastp.log &
+
+nohup blastp -query Bryobacter_CoA8_C33_genes_simple_headers.faa -db P_denitrificans_glycolate_util_genes.faa -out Bryobacter_glycolate_proteins.blastp -outfmt "7 std qlen slen qcovs" &> Bryobacter_glycolate_proteins.blastp.log &
+```
+
+Filter out hits with low e-values:
+```{bash}
+perl /geomicro/data1/COMMON/scripts/BlastTools/postBlast.pl -b Paludibaculum_glycolate_proteins.blastp -e 1e-5 -o Paludibaculum_glycolate_proteins.blastp.postblast.txt
+
+perl /geomicro/data1/COMMON/scripts/BlastTools/postBlast.pl -b Bryobacter_glycolate_proteins.blastp -e 1e-5 -o Bryobacter_glycolate_proteins.blastp.postblast.txt
+```
+There are high quality hits at 40-30% identity for each gene in the operon, but they aren't located in an operon structure like the P denitrificans genes are.
+
+-------------
+
+The next step is to see how abundant Paludibaculum is in other datasets:
+
+Compiled a list of study samples with data available in SRA to download using the SRA explorer https://ewels.github.io/sra-explorer/#
+The samples are from the following studies:
+
+1.	Cook et al (2020). Limnol Oceanogr
+a.	Collection of samples from Microcystis blooms around the globe
+b.	Bulk colony sample (collected floating colonies on a mesh without rinsing)
+c.	Bioproject: PRJNA575023 (Illumina data)
+
+2.	Shi et al (2018). MicrobiologyOpen
+a.	Buoyant cyanobacterial colonies collected on a 120 um net and washed with 
+b.	Also some free-living and non-cyanobacteria particle samples
+c.	Time series in Lake Taihu
+d.	BioProject: PRJNA386411
+e.	SRA accession: SRP108467 (Illumina data)
+
+3.	Paver et al (2020). Environ Microbiol
+a.	Comprehensive survey of free-living microbial (0.22-1.6 um) communities in the Great Lakes in spring and august over 2 years
+b.	BioProject: PRJNA591360
+
+4.	Chun et al. (2019). Frontiers in Microbiology
+a.	Monthly samples collected for one year in the Nakdong River, South Korea
+b.	Sampling times included one Microcystis bloom and one Aphanizomenon bloom
+c.	Whole water communities
+d.	SRA project number: PRJNA479553
+
+5.	Rozmarynowycz et al. (2019). J Great Lakes Res
+a.	Characterization of whole water microbial communities along a transect spanning from Lake Superior to Lake Erie
+b.	SRA accession: SRA211417
+
+6. Tromas et al. (2017). ISME J
+a. Characterization of Lake Champlain microbial community seasonality over 8 years
+b. Includes Microcystis and Anabaena bloom samples
+c. SRA accession: PRJNA353865
+d. V4 region
+
+7. Kara et al. (2012). ISME J
+a. Characterization of Lake Mendota microbial community seasonality over 10 years
+b. Includes annual cyanobacterial blooms
+c. SRA accession: PRJEB14911
+d. ribosomal intergenic transcribed spacer
+
+
+Got a bash script with curl commands with the SRA urls to the fastq data.
+Ran the script on geomicro servers to download data:
+```{bash}
+#wd: /geomicro/data22/smitdere/Paludibaculum_pubdat_search/
+nohup bash sra_explorer_curl_wrapper sra_explorer_fastq_download.sh &> sra_explorer_fastq_download.log &
+```
+
+Got the Lake Champlain and Lake Mendota samples later, so downloaded them separately:
+```{bash}
+#wd: /geomicro/data22/smitdere/Paludibaculum_pubdat_search/
+nohup bash sra_explorer_curl_wrapper Lakes_Champlain_Mendota_sra_explorer_fastq_download.sh &> Lakes_Champlain_Mendota_sra_explorer_fastq_download.log &
+```
+
+Unzip all the data:
+```{bash}
+#wd: /geomicro/data22/smitdere/Paludibaculum_pubdat_search/
+for i in *.gz; do gzip -d $i; done
+```
+
+Realized that the data from Cook et al. was incorrect. They uploaded QC'd and assembled OTUs rather than raw reads. Downloaded the correct files manually from SRA once the authors uploaded them to NCBI.
+
+The data sets span different regions of the 16S gene (V4, V3-V4, V4-V5) which have different lengths that may not allow the Illumina reads to overlap. To make data analysis simple and consistant across datasets, we will not assemble the reads into contigs.
+
+Make the configs file to run Meren's QC script:
+```{bash}
+#wd: /geomicro/data22/smitdere/Paludibaculum_pubdat_search/
+nohup iu-gen-configs sra_explorer_iu_gen_configs_input.txt &> iu-gen-configs.log &
+```
+
+Run the minoche QC using Meren's Illumina utils:
+```{bash}
+#wd: /geomicro/data22/smitdere/Paqludibaculum_pubdat_search/
+nohup bash iu-filter-quality-minoche.sh &> iu-filter-quality-minoche.log &
+```
+
+Convert all the QC'd fastq files to fasta format for blast:
+```{bash}
+#wd: /geomicro/data22/smitdere/Paludibaculum_pubdat_search/
+nohup bash fastq_to_fasta_wrapper.sh &> fastq_to_fasta_wrapper.log &
+```
+
+Note that the samples from Lake Mendota aren't paired, so they can't be QC'd with the program.
+Filter single-end reads to Q20 using bbduk:
+```{bash}
+#wd: /geomicro/data22/smitdere/Paqludibaculum_pubdat_search/
+nohup bash batch_bbduk.sh &> batch_bbduk.log &
+#The script will also convert to fasta format
+```
+
+Now map the reads from each sample to the full length 16S rRNA gene from Paludibaculum and Bryobacter bin and a database of cyanobacterial 16S sequences:
+```{bash}
+#wd: /geomicro/data22/smitdere/Paludibaculum_pubdat_search/
+#Make the blast databases (stored in the Databasefiles directory):
+makeblastdb -in WLE_Acidobacteria_16S.fasta -dbtype nucl #repeat for other sequence files
+
+#Blast reads to the database, and filter out all hits with e-value less than 1e-5 and percent identity less than 97%:
+nohup bash Acidobacteria_16S_blast_wrapper.sh &> Acidobacteria_16S_blast_wrapper.log &
+nohup bash Cyanobacteria_16S_blast_wrapper.sh &> Cyanobacteria_16S_blast_wrapper.log &
+
+```
+
+Filter out any short alignments:
+```{bash}
+#wd: /geomicro/data22/smitdere/Paludibaculum_pubdat_search/
+#Only keep hits that have an alignment length that covers 95% or more of the read length
+nohup bash Filter_out_short_alignments.sh &> Filter_out_short_alignments.log &
+nohup bash Filter_out_short_alignments_Acidos.sh &> Filter_out_short_alignments_Acidos.log &
+```
+
+Dereplicate the blast hits (so that each read is counted once):
+```{bash}
+#wd: /geomicro/data22/smitdere/Paludibaculum_pubdat_search/
+for i in *.QCd; do perl /geomicro/data1/COMMON/scripts/BlastTools/top5.pl -b $i -t 1 -o ${i}.top5.txt; done
+```
+
+Sum up the number of reads (both forward and reverse that mapped to the 16S gene):
+```{bash}
+#wd: /geomicro/data22/smitdere/Paludibaculum_pubdat_search/
+nohup bash sum_blast_hits.sh &> sum_blast_hits.log &
+```
+
+Load the data into R and convert to relative abundance:
+```{r}
+#Load data and add in column names:
+ssu_pub_data <- read.table("Summed_16S_hits_by_organism.txt", header=FALSE, sep="\t")
+colnames(ssu_pub_data) <- c("Sample", "Organism", "Read_count", "Total_reads")
+
+#Convert to wide format:
+ssu_pub_data_wide <- spread(ssu_pub_data, Organism, Read_count)
+
+#Sum the Anabaena and Dolichosperumum reads that mapped
+ssu_pub_data_wide$Anabaena <- ssu_pub_data_wide$Anabaena_cylindrica_PCC_7122 + ssu_pub_data_wide$Dolichospermum_Erie_Emirge
+
+#Sum the Microcystis reads that mapped
+ssu_pub_data_wide$Microcystis <- ssu_pub_data_wide$Microcystis_aeruginosa_PCC_7806SL + ssu_pub_data_wide$Microcystis_aeruginosa_PCC_9806 + ssu_pub_data_wide$Microcystis_Erie_Emirge
+
+#Sum up the Synechococcus reads that mapped
+ssu_pub_data_wide$Synechococcus <- ssu_pub_data_wide$Synechococcus_elongatus_PCC_6301 + ssu_pub_data_wide$Synechococcus_elongatus_PCC_7942 + ssu_pub_data_wide$Synechococcus_Erie_Emirge
+
+#Remove the columns for each individual reference sequence
+drop <- c("Anabaena_cylindrica_PCC_7122", "Dolichospermum_Erie_Emirge", "Microcystis_aeruginosa_PCC_7806SL", "Microcystis_aeruginosa_PCC_9806", "Microcystis_Erie_Emirge", "Synechococcus_elongatus_PCC_6301", "Synechococcus_elongatus_PCC_7942", "Synechococcus_Erie_Emirge")
+
+ssu_pub_data_wide <- ssu_pub_data_wide[ , !(names(ssu_pub_data_wide) %in% drop)]
+names(ssu_pub_data_wide)[3:4] <- c("Bryobacter", "Paludibaculum")
+
+#Remove samples with less than 1000 reads:
+ssu_pub_data_wide <- ssu_pub_data_wide[ ssu_pub_data_wide$Total_reads >= 1000, ]
+
+#Calculate Percent abundances for each organism:
+for (i in 3:dim(ssu_pub_data_wide)[2]){
+  ssu_pub_data_wide[,i] <-  ssu_pub_data_wide[,i] / ssu_pub_data_wide$Total_reads * 100
+}
+
+#Load metadata:
+ssu_pud_metadata <- read.table("sra_metadata.txt", header=TRUE, sep="\t")
+
+#Merge the metadata with the read count dataframe:
+ssu_pub_data_merged <- merge(ssu_pub_data_wide, ssu_pud_metadata, by = c("Sample"), all = TRUE)
+
+#Add the formated data into the long format dataframe for time series plotting:
+ssu_pub_data <- gather(ssu_pub_data_merged, Organism, Perc_Abund, Bryobacter:Synechococcus)
+```
+
+Remove samples where there is no NCBI metadata:
+```{r}
+ssu_pub_data_merged <- ssu_pub_data_merged[rowSums(is.na(ssu_pub_data_merged)) == 0,]
+ssu_pub_data <- ssu_pub_data[rowSums(is.na(ssu_pub_data_merged)) == 0,]
+```
+
+Build a linear regression model of Paludibaculum relative abundance and Microcystis relative abundance:
+```{r}
+#calculate the correlation:
+cor(ssu_pub_data_merged$Microcystis, ssu_pub_data_merged$Paludibaculum, method = "pearson")
+#Build a linear model:
+#syntax is lm(y-variable ~ x-variable)
+regMCvsPalud <- lm(Paludibaculum ~ Microcystis, data=ssu_pub_data_merged)
+summary(regMCvsPalud)
+```
+
+Plot the regression:
+```{r}
+Microcystis_vs_Palud_pub <- ggplot(ssu_pub_data_merged, aes(x=Microcystis, y=Paludibaculum)) +
+  geom_smooth(method=lm, color="black", fill="lightgray", se=TRUE, size=0.2) +
+  geom_point(size = 2, alpha = 0.7, color="blue") +
+  theme_classic() +
+    theme(plot.background = element_rect(color = "NA"),
+          axis.line.x = element_line(size=0.1),
+          axis.line.y = element_line(size=0.1),
+          axis.text.x = element_text(size = 18 / .pt, color = "black", margin = margin(t = 6, r = 0, b = 0, l = 0)),
+          axis.title.x = element_text(size = 16 / .pt, color = "black", margin = margin(t = 6, r = 0, b = 0, l = 0)),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          axis.title.y = element_text(size = 18 / .pt, color = "black", margin = margin(t = 0, r = 8, b = 0, l = 0)),
+          axis.text.y = element_text(size = 16 / .pt, color = "black", margin = margin(t = 0, r = 6, b = 0, l = 0)),
+          axis.ticks.length = unit(-0.1, "cm"),
+          axis.ticks = element_line(size=0.1)) +
+  coord_cartesian(ylim=c(0,0.75), xlim=c(0,75)) +
+  scale_x_continuous(breaks = seq(0,75,15)) + 
+  scale_y_continuous(breaks = seq(0,0.75,0.15)) + 
+  xlab(expression("Microcystis Percent Abundance")) +
+  ylab(expression("Acidobacterium CoA2 C42 Percent Abundance"))
+
+Microcystis_vs_Palud_pub
+```
+
+Build a linear regression model of Paludibaculum relative abundance and Anabaena/Synechococcus relative abundance:
+```{r}
+#calculate the correlation:
+cor(ssu_pub_data_merged$Anabaena, ssu_pub_data_merged$Paludibaculum)
+#Build a linear model:
+#syntax is lm(y-variable ~ x-variable)
+regAnabaenavsPalud <- lm(Paludibaculum ~ Anabaena, data=ssu_pub_data_merged)
+summary(regAnabaenavsPalud)
+
+#calculate the correlation:
+cor(ssu_pub_data_merged$Synechococcus, ssu_pub_data_merged$Paludibaculum)
+#Build a linear model:
+#syntax is lm(y-variable ~ x-variable)
+regSynvsPalud <- lm(Paludibaculum ~ Synechococcus, data=ssu_pub_data_merged)
+summary(regSynvsPalud)
+```
+Build a linear regression model of Bryobacter relative abundance and Microcystis relative abundance:
+```{r}
+#calculate the correlation:
+cor(ssu_pub_data_merged$Microcystis, ssu_pub_data_merged$Bryobacter, method = "pearson")
+#Build a linear model:
+#syntax is lm(y-variable ~ x-variable)
+regMCvsBryo <- lm(Bryobacter ~ Microcystis, data=ssu_pub_data_merged)
+summary(regMCvsBryo)
+```
+
+Plot the regression:
+```{r}
+Microcystis_vs_Byro_pub <- ggplot(ssu_pub_data_merged, aes(x=Microcystis, y=Bryobacter)) +
+  geom_smooth(method=lm, color="black", fill="lightgray", se=TRUE, size=0.2) +
+  geom_point(size = 2, alpha = 0.7, color="red") +
+    theme_classic() +
+    theme(plot.background = element_rect(color = "NA"),
+          axis.line.x = element_line(size=0.1),
+          axis.line.y = element_line(size=0.1),
+          axis.text.x = element_text(size = 18 / .pt, color = "black", margin = margin(t = 6, r = 0, b = 0, l = 0)),
+          axis.title.x = element_text(size = 16 / .pt, color = "black", margin = margin(t = 6, r = 0, b = 0, l = 0)),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          axis.title.y = element_text(size = 18 / .pt, color = "black", margin = margin(t = 0, r = 8, b = 0, l = 0)),
+          axis.text.y = element_text(size = 16 / .pt, color = "black", margin = margin(t = 0, r = 6, b = 0, l = 0)),
+          axis.ticks.length = unit(-0.1, "cm"),
+          axis.ticks = element_line(size=0.1)) +
+  coord_cartesian(ylim=c(0,0.45), xlim=c(0,75)) +
+  scale_x_continuous(breaks = seq(0,75,15)) + 
+  scale_y_continuous(breaks = seq(0,0.45,0.15)) + 
+  xlab(expression("Microcystis Percent Abundance")) +
+  ylab(expression("Bryobacter Percent Abundance"))
+
+Microcystis_vs_Acido_pub <- Microcystis_vs_Byro_pub + Microcystis_vs_Palud_pub
+Microcystis_vs_Acido_pub
+ggsave("Microcystis_vs_Acido_pub.pdf", Microcystis_vs_Acido_pub, width = 175, height = 85, units = "mm")
+```
+On average, what is the relative abundance of Bryobacter in samples in which Microcystis is present?
+```{r}
+ssu_pub_data_merged_Bryo <- ssu_pub_data_merged[ssu_pub_data_merged$Microcystis < 1, ]
+mean(ssu_pub_data_merged_Bryo$Bryobacter)
+sd(ssu_pub_data_merged_Bryo$Bryobacter)
+min(ssu_pub_data_merged_Bryo$Bryobacter)
+max(ssu_pub_data_merged_Bryo$Bryobacter)
+```
+
+
+Make a plot of Paludibaculum, Bryobacter, and Microcystis relative abundance in the South Korea time series:
+```{r}
+#These plots will be easier to build with the long format:
+#Separate the data by study old command for the wide format table:
+MC_South_Korea <- ssu_pub_data[ grep("South Korea", ssu_pub_data$Description), ]
+
+#Shorten station names
+MC_South_Korea$Description <- gsub('Nakdong River, South Korea Site MG1', 'Site MG1', MC_South_Korea$Description)
+
+MC_South_Korea$Description <- gsub('Nakdong River, South Korea Site MG2', 'Site MG2', MC_South_Korea$Description)
+
+MC_South_Korea$Description <- gsub('Nakdong River, South Korea Site USF', 'Site USF', MC_South_Korea$Description)
+
+#Convert the data in the Date column to date format:
+MC_South_Korea$Date <- dmy(MC_South_Korea$Date)
+
+#Plot:
+ggplot(MC_South_Korea, aes(x=Date, y=Perc_Abund, group=interaction(Description, Depth.Class), color=interaction(Description, Depth.Class))) +
+    facet_wrap(~Organism, nrow = 4, scales = "free_y") +
+    stat_summary(fun.y="mean", geom="line") + #This plots the averages of replicates for each grouping, rather than each replicate point separately
+    stat_summary(fun.y="mean", geom="point") + #Repeat for point geom.
+    theme_classic() +
+    theme(plot.background = element_rect(color = "NA"),
+          axis.line.x = element_line(size=0.1),
+          axis.line.y = element_line(size=0.1),
+          axis.text.x = element_text(size = 18 / .pt, color = "black", margin = margin(t = 6, r = 0, b = 0, l = 0)),
+          axis.title.x = element_text(size = 16 / .pt, color = "black", margin = margin(t = 6, r = 0, b = 0, l = 0)),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          axis.title.y = element_text(size = 18 / .pt, color = "black", margin = margin(t = 0, r = 8, b = 0, l = 0)),
+          axis.text.y = element_text(size = 16 / .pt, color = "black", margin = margin(t = 0, r = 6, b = 0, l = 0)),
+          axis.ticks.length = unit(-0.1, "cm"),
+          axis.ticks = element_line(size=0.1),
+          legend.title = element_blank()) +
+    scale_x_date(date_breaks = "2 months", date_labels = "%b %Y") +
+    xlab("") +
+    ylab("Percent abundance")
+```
+
+
+Make a plot of Paludibaculum, Microcystis, and Anabaena relative abundance in the Lake Taihu time series:
+```{r}
+#Separate the data for Lake Taihu:
+MC_Taihu <- ssu_pub_data[ grep("Lake Taihu", ssu_pub_data$Description), ]
+
+#Convert the data in the Date column to date format:
+MC_Taihu$Date <- dmy(MC_Taihu$Date)
+
+#Shorten legend text
+MC_Taihu$Description <- gsub('Lake Taihu, China', 'Lake Taihu', MC_Taihu$Description)
+
+#Remove the Synechoccous results from this graph:  
+MC_Taihu <- MC_Taihu[ MC_Taihu$Organism != "Synechococcus", ]
+
+#Plot:
+MC_Taihu_plot <- ggplot(MC_Taihu, aes(x=Date, y=Perc_Abund, group=interaction(Description, Size.Fraction), color=interaction(Description, Size.Fraction))) +
+    facet_wrap(~Organism, nrow = 5, scales = "free_y") +
+    geom_line(size=0.5) +
+    geom_point(size=1) +
+    theme_classic() +
+    theme(plot.background = element_rect(color = "NA"),
+          strip.background = element_blank(),
+          panel.spacing = unit(5, "mm"),
+          axis.line.x = element_line(size=0.1),
+          axis.line.y = element_line(size=0.1),
+          axis.text.x = element_text(size = 18 / .pt, color = "black", angle = 45, hjust = 1, margin = margin(t = 6, r = 0, b = 0, l = 0)),
+          axis.title.x = element_text(size = 16 / .pt, color = "black", margin = margin(t = 6, r = 0, b = 0, l = 0)),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          axis.title.y = element_text(size = 18 / .pt, color = "black", margin = margin(t = 0, r = 8, b = 0, l = 0)),
+          axis.text.y = element_text(size = 16 / .pt, color = "black", margin = margin(t = 0, r = 6, b = 0, l = 0)),
+          axis.ticks.length = unit(-0.1, "cm"),
+          axis.ticks = element_line(size=0.1),
+      legend.title = element_blank(),
+      legend.position = "top") +
+    scale_x_date(date_breaks = "1 month", date_labels = "%b %Y") +
+    scale_color_manual(values = c("red", "blue", "purple")) +
+    xlab("") +
+    ylab("Percent abundance")
+
+MC_Taihu_plot
+ggsave("MC_Taihu_plot.pdf", MC_Taihu_plot, width = 175, height = 105, units = "mm")
+```
+
+While Paludibaculum sp. frequently co-occur with Microcystis, it can also be present without Microcystis, and there is no consistant correlation between the relative abundance of Paludibaculum and Microcystis across all the public datasets. In Lake Taihu, Paludibaculum is associated with small particles 3-36 um rather than large phytoplankton particles as observed in Lake Erie.  
+
+Bryobacter has a weak but significant correlation with Microcystis abundance in published datasets. Unlike Paludibaculum, Bryobacter was associated with the larger size fraction that contained Microcystis in the Lake Taihu dataset, and correlated with Microcystis abundance.   
+
+Plot Paludibaculum abundance in the Paver dataset:
+```{r}
+#Separate out just the Paver data from the dataframe
+patterns <- c("Lake Erie", "Lake Ontario", "Lake Superior", "Lake Huron", "Lake Michigan")
+Paver_df <- ssu_pub_data[ grep(paste(patterns, collapse="|"),ssu_pub_data$Description), ]
+
+#Convert the date to correct format
+Paver_df$Date <- dmy(Paver_df$Date)
+
+#Create a month and year column to color the samples by
+Paver_df$Month <- month(Paver_keep$Date)
+Paver_df$Year <- year(Paver_keep$Date)
+
+#Only want to plot Paludibaculum and Bryobacter.
+Paver_keep <- Paver_df[ Paver_df$Organism == "Paludibaculum", ]
+
+#Clean up Description names
+Paver_keep$Description <- gsub('Lake ', '', Paver_keep$Description)
+Paver_keep$Description <- gsub(', USA Station [0-9]*', '', Paver_keep$Description, perl=TRUE)
+Paver_keep$Description <- gsub(', USA, Station [0-9]*', '', Paver_keep$Description, perl=TRUE)
+
+
+#Color palette:
+cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+#Plot
+Paver_Acido_plot <- ggplot(Paver_keep, aes(x=interaction(Date,Description), y=Perc_Abund, fill=interaction(Month,Year))) +
+    stat_summary(fun="mean", geom="bar") + #This plots the averages of replicates for each grouping, rather than each replicate point separately
+    facet_wrap(~Organism, nrow = 2, scales = "fixed") +
+    theme_classic() +
+    theme(plot.background = element_rect(color = "NA"),
+          strip.background = element_blank(),
+          strip.text = element_blank(),
+          panel.spacing = unit(5, "mm"),
+          axis.line.x = element_line(size=0.1),
+          axis.line.y = element_line(size=0.1),
+          axis.text.x = element_text(size = 18 / .pt, color = "black", angle = 45, hjust = 1, margin = margin(t = 6, r = 0, b = 0, l = 0)),
+          axis.title.x = element_text(size = 16 / .pt, color = "black", margin = margin(t = 6, r = 0, b = 0, l = 0)),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          axis.title.y = element_text(size = 18 / .pt, color = "black", margin = margin(t = 0, r = 8, b = 0, l = 0)),
+          axis.text.y = element_text(size = 16 / .pt, color = "black", margin = margin(t = 0, r = 6, b = 0, l = 0)),
+          axis.ticks.length = unit(-0.1, "cm"),
+          axis.ticks = element_line(size=0.1),
+      legend.title = element_blank()) +
+    coord_cartesian(ylim=c(0,0.6)) +
+    scale_fill_manual(values=cbbPalette) +
+    xlab("") +
+    ylab("Percent abundance")
+Paver_Acido_plot
+ggsave("Paver_Acido_plot.pdf", Paver_Acido_plot, width = 85, height = 85, units = "mm")
+```
+Paludibaculum is in free-living microbial communities in the Great Lakes, but Bryobacter is not.  
+
+Plot Paludibaculum abundance in the Cook dataset:
+```{r}
+#Separate out just the Cook data from the dataframe:
+patterns <- c("Chaohu Lake", "Villerest Lake", "Rotoehu Lake", "Kinneret Lake", "Grand Lake o the Cherokees", "Fish Pond 23 Lake", "Clarendon Lake", "Belso-to Lake", "Lake Aasee")
+Cook_df <- ssu_pub_data[ grep(paste(patterns,collapse="|"),ssu_pub_data$Description), ]
+
+#Convert the date to correct format
+Cook_df$Date <- dmy(Cook_df$Date)
+
+#Clean up description names
+Cook_df$Description <- gsub(' Microcystis Bloom,.*', '', Cook_df$Description)
+
+#Only keep Paludibaculum data
+Cook_df <- Cook_df[ Cook_df$Organism == "Paludibaculum" | Cook_df$Organism == "Bryobacter", ]
+
+#Plot
+ggplot(Cook_df, aes(x=Description, y=Perc_Abund)) +
+    stat_summary(fun.y="mean", geom="bar") + #This plots the averages of replicates for each grouping, rather than each replicate point separately
+    facet_wrap(~Organism, nrow = 2, scales = "free_y") +
+    theme(axis.title.x = element_text(size=15, margin = margin(t = 14, r = 0, b = 0, l = 0)), 
+      axis.title.y = element_text(size=15, margin = margin(t = 0, r = 14, b = 0, l = 0)),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      axis.text.x = element_text(size = 11, color = "black", angle=60, hjust=1,  margin = margin(t = 12, r = 0, b = 0, l = 0)),
+      axis.text.y = element_text(size = 12, color = "black", margin = margin(t = 0, r = 12, b = 0, l = 0)),
+      axis.ticks.length= unit(-0.2, "cm")) +
+    xlab("") +
+    ylab("Percent abundance")
+```
+What is the abundance of Paludibaculum in the WLE mesocosms?
+```{r}
+#Load dataframes:
+LE_H2O2_2019_all.shared <- read.table("LE_H2O2_all.shared", header = TRUE, sep="\t")
+LE_H2O2_2019_all.taxonomy <- read.table("LE_H2O2.taxonomy", header = TRUE, sep="\t")
+LE_H2O2_2019_all.metadata <- read.table("LE_H2O2_all_metadata.txt", header= TRUE, sep="\t")
+
+#Fix up OTU table and merge with taxonomy table:
+rownames(LE_H2O2_2019_all.shared) <- LE_H2O2_2019_all.shared$Group
+drop <- c("label", "numOtus", "Group")
+LE_H2O2_2019_all.shared <- LE_H2O2_2019_all.shared[ , !(names(LE_H2O2_2019_all.shared) %in% drop)]
+LE_H2O2_2019_all.shared <- t(LE_H2O2_2019_all.shared) #transpose table so that OTUs are row names for merging
+LE_H2O2_2019_all.shared <- LE_H2O2_2019_all.shared[rowSums(LE_H2O2_2019_all.shared) != 0,] #Remove Otus that are absent from colony samples
+rownames(LE_H2O2_2019_all.taxonomy) <- LE_H2O2_2019_all.taxonomy$OTU
+drop <- "OTU"
+LE_H2O2_2019_all.taxonomy <- LE_H2O2_2019_all.taxonomy[ , !(names(LE_H2O2_2019_all.taxonomy) %in% drop)]
+LE_H2O2_2019_all.taxonomy <- LE_H2O2_2019_all.taxonomy[ LE_H2O2_2019_all.taxonomy$Size > 2, ] #Only keep OTUs that have more than 2 sequences
+LE_H2O2_2019_all.merged <- merge(LE_H2O2_2019_all.shared, LE_H2O2_2019_all.taxonomy, by="row.names", all = FALSE)
+#Divide the taxonomy into separate columns for each rank for sorting
+LE_H2O2_2019_all.merged <- separate(LE_H2O2_2019_all.merged, Taxonomy, c("Domain", "Phylum", "Class", "Order", "Family", "Genus"), sep=";", remove=TRUE)
+
+#Remove samples that were controls and had a low number of reads:
+drop <- LE_H2O2_2019_all.metadata$Sample_ID[ LE_H2O2_2019_all.metadata$Enough_reads == "No" ]
+LE_H2O2_2019_all.merged <- LE_H2O2_2019_all.merged[ , !(names(LE_H2O2_2019_all.merged) %in% drop)]
+
+#Remove the cross-contaminated samples:
+drop <- c("E2019_1152_1", "E2019_1177_1")
+LE_H2O2_2019_all.merged <- LE_H2O2_2019_all.merged[ , !(names(LE_H2O2_2019_all.merged) %in% drop)]
+
+#Remove the Mock Sample:
+drop <- "MC2019_Mock"
+LE_H2O2_2019_all.merged <- LE_H2O2_2019_all.merged[ , !(names(LE_H2O2_2019_all.merged) %in% drop)]
+
+#Convert to percent abundance:
+LE_H2O2_2019_all.merged[, 2:358] <- apply(LE_H2O2_2019_all.merged[,2:358], 2, function(x) (x / sum(x)) *100 )
+
+#Convert dataframe to long format:
+LE_H2O2_2019_all.merged.long <- gather(LE_H2O2_2019_all.merged, Sample_ID, Perc_abund, 2:358)
+
+#Add metadata:
+LE_H2O2_2019_all.merged.long <- merge(LE_H2O2_2019_all.merged.long, LE_H2O2_2019_all.metadata, by="Sample_ID", all.x = TRUE)
+drop <- c("Amplification", "Enough_reads", "Extraction_Date") #remove these columns, because they are no longer useful
+LE_H2O2_2019_all.merged.long <- LE_H2O2_2019_all.merged.long[, !(names(LE_H2O2_2019_all.merged.long) %in% drop) ]
+```
+
+Extract out the Paludibaculum, Bryobacter, and Microcystis OTUs, and plot the relative abundance in WLE samples:
+
+Determine which OTUs are >= 97% nucleotide similarity to the 16S rRNA sequences from Acidobacterium CoA2 C42:
+Do this because the CoA2-C33 MAG was classified as Paludibaculum with the Wang method used for the OTUs, but it's actually pretty different from the Paludibaculum reference (92% id). So we want to separate these OTUs out from other uncultured OTUs classified as Paludibaculum from the Wang method.
+
+Done on vondamm (working directory:)
+
+command for blast:
+nohup blastn -query Acidobacteria_Bins_16S_rRNA.fasta -db LE_H2O2.repseq.degapped.fasta -outfmt "7 std qlen slen qcovs" -out Acido_16S_vs_WLE_OTUs.blastn &> Acido_16S_vs_WLE_OTUs.log
+
+Then filter the output:
+Keep everything with bit score higher than 50, e-value bigger than 1e-5, and percent match higher than 90%
+ perl /geomicro/data1/COMMON/scripts/BlastTools/postBlast.pl -b Acido_16S_vs_WLE_OTUs.blastn -p 90 -e 1e-5 -s 50 -o Acido_16S_vs_WLE_OTUs.blastn.postblast.txt
+
+
+```{r}
+#First, isolate the Microcystis, Bryobacter, Paludibaculum, Anabaena, and Cyanobium OTUs. Sum their relative abundance for each date.
+LE_H2O2_2019_all.merged.target_taxa <- filter(LE_H2O2_2019_all.merged.long, Genus == "Microcystis_PCC-7914" | Genus == "Bryobacter" | Genus == "Paludibaculum" | Genus == "Dolichospermum_NIES41" | Genus == "Cyanobium_PCC-6307")
+
+#This is a vector of all the Paludibaculum OTUs that matched with 97% id or higher to the Acidobacterium CoA2-C42 16S rRNA sequence:
+Paludibaculum_OTUs_to_keep <- c("Otu00067", "Otu16080", "Otu37781", "Otu37616", "Otu37153", "Otu36993", "Otu31798", "Otu31516", "Otu20453", "Otu20374", "Otu20334", "Otu19591", "Otu15126", "Otu12973", "Otu12306", "Otu10530", "Otu09876", "Otu09834", "Otu09353", "Otu08538", "Otu07319", "Otu06783", "Otu20469", "Otu22133", "Otu31685", "Otu23687", "Otu20765", "Otu20385", "Otu16332", "Otu37258", "Otu32880", "Otu23686", "Otu23377", "Otu23147", "Otu22385", "Otu21688", "Otu17491", "Otu16480", "Otu10671")
+
+#This loop creates a vector of all the Paludibaculum OTUs that are not in the above vector
+vec <- numeric()
+for (i in 1:dim(LE_H2O2_2019_all.merged.target_taxa)[1]){
+  if(LE_H2O2_2019_all.merged.target_taxa$Genus[i] == "Paludibaculum"){
+    if(!(LE_H2O2_2019_all.merged.target_taxa$Row.names[i] %in% Paludibaculum_OTUs_to_keep)){
+      vec <- c(vec, i)
+    }
+  }
+}
+
+#Remove the Paludibaculum OTUs that matched to the bin 16S below 97% id:
+LE_H2O2_2019_all.merged.target_taxa <- LE_H2O2_2019_all.merged.target_taxa[-vec,]
+
+#Sum the remaining OTU counts by sample and genus:
+LE_H2O2_2019_all.merged.target_taxa <-  LE_H2O2_2019_all.merged.target_taxa %>%
+  group_by(Sample_ID, Date_Collected, Sample_Type, Station, Genus) %>%
+  summarise(sum=sum(Perc_abund))
+
+#Then, calculate the average total abundance of each genus in the replicate samples:
+LE_H2O2_2019_all.merged.summary <- LE_H2O2_2019_all.merged.target_taxa %>%
+  group_by(Date_Collected, Station, Sample_Type, Genus) %>%
+  summarise(mean=mean(sum), ci=(sd(sum)/sqrt(n()))*1.96)
+
+#Clean up genus names in table:
+LE_H2O2_2019_all.merged.summary$Genus <- gsub('Cyanobium_PCC-6307', 'Cyanobium', LE_H2O2_2019_all.merged.summary$Genus)
+LE_H2O2_2019_all.merged.summary$Genus <- gsub('Dolichospermum_NIES41', 'Dolichospermum', LE_H2O2_2019_all.merged.summary$Genus)
+LE_H2O2_2019_all.merged.summary$Genus <- gsub('Microcystis_PCC-7914', 'Microcystis', LE_H2O2_2019_all.merged.summary$Genus)
+
+#Convert dataframe to wide format:  
+LE_H2O2_2019_all.merged.summary.mean <- dcast(LE_H2O2_2019_all.merged.summary, Date_Collected + Station + Sample_Type ~ Genus, value.var = "mean")
+names(LE_H2O2_2019_all.merged.summary.mean)[4:8] <- c("Bryobacter_mean", "Cyanobium_mean", "Dolichospermum_mean", "Microcystis_mean", "Paludibaculum_mean")
+
+LE_H2O2_2019_all.merged.summary.ci <- dcast(LE_H2O2_2019_all.merged.summary, Date_Collected + Station + Sample_Type ~ Genus, value.var = "ci")
+names(LE_H2O2_2019_all.merged.summary.ci)[4:8] <- c("Bryobacter_ci", "Cyanobium_ci", "Dolichospermum_ci", "Microcystis_ci", "Paludibaculum_ci")
+
+LE_H2O2_2019_all.merged.summary.wide <- merge(LE_H2O2_2019_all.merged.summary.mean, LE_H2O2_2019_all.merged.summary.ci, by = c("Date_Collected", "Station", "Sample_Type"))
+rm(LE_H2O2_2019_all.merged.summary.mean, LE_H2O2_2019_all.merged.summary.ci)
+
+#Only keep Whole water samples:
+LE_H2O2_2019_all.merged.summary.wide.WW_only <- LE_H2O2_2019_all.merged.summary.wide[ LE_H2O2_2019_all.merged.summary.wide$Sample_Type == "Whole Water", ]
+
+#Make scatter plot of Bryobacter and Paludibaculum vs Microcystis: 
+Microcystis_vs_Bryo <- ggplot(LE_H2O2_2019_all.merged.summary.wide.WW_only, aes(x=Microcystis_mean, y=Bryobacter_mean)) +
+  geom_smooth(method=lm, color="black", fill="lightgray", se=TRUE, size=0.2) +
+  geom_point(alpha=0.7, color="red") +
+  geom_errorbar(aes(ymin=Bryobacter_mean-Bryobacter_ci, ymax=Bryobacter_mean+Bryobacter_ci), width=0.5, size=0.2, color="red", na.rm = TRUE) +
+  geom_errorbarh(aes(xmin=Microcystis_mean-Microcystis_ci, xmax=Microcystis_mean+Microcystis_ci), height=0.05, size=0.2, color="red", na.rm = TRUE) +
+    theme_classic() +
+    theme(plot.background = element_rect(color = "NA"),
+          axis.line.x = element_line(size=0.1),
+          axis.line.y = element_line(size=0.1),
+          axis.text.x = element_text(size = 18 / .pt, color = "black", margin = margin(t = 6, r = 0, b = 0, l = 0)),
+          axis.title.x = element_text(size = 16 / .pt, color = "black", margin = margin(t = 6, r = 0, b = 0, l = 0)),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          axis.title.y = element_text(size = 18 / .pt, color = "black", margin = margin(t = 0, r = 8, b = 0, l = 0)),
+          axis.text.y = element_text(size = 16 / .pt, color = "black", margin = margin(t = 0, r = 6, b = 0, l = 0)),
+          axis.ticks.length = unit(-0.1, "cm"),
+          axis.ticks = element_line(size=0.1)) +
+    coord_cartesian(ylim=c(0,2), xlim=c(0,40)) +
+    ylab("Bryobacter OTU Percent Abundance") + 
+    xlab("Microcystis OTU Percent Abundance")
+
+Microcystis_vs_Palud <- ggplot(LE_H2O2_2019_all.merged.summary.wide.WW_only, aes(x=Microcystis_mean, y=Paludibaculum_mean)) +
+  geom_smooth(method=lm, color="black", fill="lightgray", se=TRUE, size=0.2) +
+  geom_point(alpha=0.7, color="blue") +
+  geom_errorbar(aes(ymin=Paludibaculum_mean-Paludibaculum_ci, ymax=Paludibaculum_mean+Paludibaculum_ci), width=0.5, size=0.2, color="blue", na.rm = TRUE) +
+  geom_errorbarh(aes(xmin=Microcystis_mean-Microcystis_ci, xmax=Microcystis_mean+Microcystis_ci), height=0.05, size=0.2, color="blue", na.rm = TRUE) +
+    theme_classic() +
+    theme(plot.background = element_rect(color = "NA"),
+          axis.line.x = element_line(size=0.1),
+          axis.line.y = element_line(size=0.1),
+          axis.text.x = element_text(size = 18 / .pt, color = "black", margin = margin(t = 6, r = 0, b = 0, l = 0)),
+          axis.title.x = element_text(size = 16 / .pt, color = "black", margin = margin(t = 6, r = 0, b = 0, l = 0)),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          axis.title.y = element_text(size = 18 / .pt, color = "black", margin = margin(t = 0, r = 8, b = 0, l = 0)),
+          axis.text.y = element_text(size = 16 / .pt, color = "black", margin = margin(t = 0, r = 6, b = 0, l = 0)),
+          axis.ticks.length = unit(-0.1, "cm"),
+          axis.ticks = element_line(size=0.1)) +
+    coord_cartesian(ylim=c(0,2), xlim=c(0,40)) +
+    ylab("Acidobacterium CoA2 C42 OTU Percent Abundance") + 
+    xlab("Microcystis OTU Percent Abundance")
+
+Microcystis_vs_Acido_WLE <- Microcystis_vs_Bryo + Microcystis_vs_Palud
+ggsave("Microcystis_vs_Acido_WLE.pdf", Microcystis_vs_Acido_WLE, width = 175, height = 85, units = "mm")
+Microcystis_vs_Acido_WLE
+```
+Calculate the pearson correlation and regression stats for the above scatter plots:  
+```{r}
+#First, Bryobacter:  
+#calculate the correlation:
+cor(LE_H2O2_2019_all.merged.summary.wide.WW_only$Microcystis_mean, LE_H2O2_2019_all.merged.summary.wide.WW_only$Bryobacter_mean, method = "pearson")
+#Build a linear model:
+#syntax is lm(y-variable ~ x-variable)
+regMCvsBryo_WLE <- lm(Bryobacter_mean ~ Microcystis_mean, data=LE_H2O2_2019_all.merged.summary.wide.WW_only)
+summary(regMCvsBryo_WLE)
+
+#Second Paludibaculum:
+#calculate the correlation:
+cor(LE_H2O2_2019_all.merged.summary.wide.WW_only$Microcystis_mean, LE_H2O2_2019_all.merged.summary.wide.WW_only$Paludibaculum_mean, method = "pearson")
+#Build a linear model:
+#syntax is lm(y-variable ~ x-variable)
+regMCvsPalud_WLE <- lm(Paludibaculum_mean ~ Microcystis_mean, data=LE_H2O2_2019_all.merged.summary.wide.WW_only)
+summary(regMCvsPalud_WLE)
+```
+
+What is the correlation like in 100 um retentate samples from 2014?:
+```{r}
+#Only keep Whole water samples:  
+LE_H2O2_2019_all.merged.summary.wide.100umret_only <- LE_H2O2_2019_all.merged.summary.wide[ LE_H2O2_2019_all.merged.summary.wide$Sample_Type == "100um ret", ]
+
+#Create a month column to color the points by:  
+LE_H2O2_2019_all.merged.summary.wide.100umret_only$month <- month(dmy(LE_H2O2_2019_all.merged.summary.wide.100umret_only$Date_Collected))
+
+#Make scatter plot of Bryobacter and Paludibaculum vs Microcystis: 
+Microcystis_vs_Bryo_100um_ret <- ggplot(LE_H2O2_2019_all.merged.summary.wide.100umret_only, aes(x=Microcystis_mean, y=Bryobacter_mean, color=as.factor(month))) +
+  geom_smooth(method=lm, color="black", fill="lightgray", se=TRUE, size=0.2) +
+  geom_point(alpha=0.7) +
+  geom_errorbar(aes(ymin=Bryobacter_mean-Bryobacter_ci, ymax=Bryobacter_mean+Bryobacter_ci), width=0.5, size=0.2, color="red", na.rm = TRUE) +
+  geom_errorbarh(aes(xmin=Microcystis_mean-Microcystis_ci, xmax=Microcystis_mean+Microcystis_ci), height=0.05, size=0.2, color="red", na.rm = TRUE) +
+    theme_classic() +
+    theme(plot.background = element_rect(color = "NA"),
+          axis.line.x = element_line(size=0.1),
+          axis.line.y = element_line(size=0.1),
+          axis.text.x = element_text(size = 18 / .pt, color = "black", margin = margin(t = 6, r = 0, b = 0, l = 0)),
+          axis.title.x = element_text(size = 16 / .pt, color = "black", margin = margin(t = 6, r = 0, b = 0, l = 0)),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          axis.title.y = element_text(size = 18 / .pt, color = "black", margin = margin(t = 0, r = 8, b = 0, l = 0)),
+          axis.text.y = element_text(size = 16 / .pt, color = "black", margin = margin(t = 0, r = 6, b = 0, l = 0)),
+          axis.ticks.length = unit(-0.1, "cm"),
+          axis.ticks = element_line(size=0.1),
+          legend.position = "none") +
+    ylab("Bryobacter OTU Percent Abundance") + 
+    xlab("Microcystis OTU Percent Abundance")
+
+Microcystis_vs_Palud_100um_ret <- ggplot(LE_H2O2_2019_all.merged.summary.wide.100umret_only, aes(x=Microcystis_mean, y=Paludibaculum_mean, color=as.factor(month))) +
+  geom_smooth(method=lm, color="black", fill="lightgray", se=TRUE, size=0.2) +
+  geom_point(alpha=0.7) +
+  geom_errorbar(aes(ymin=Paludibaculum_mean-Paludibaculum_ci, ymax=Paludibaculum_mean+Paludibaculum_ci), width=0.5, size=0.2, color="blue", na.rm = TRUE) +
+  geom_errorbarh(aes(xmin=Microcystis_mean-Microcystis_ci, xmax=Microcystis_mean+Microcystis_ci), height=0.05, size=0.2, color="blue", na.rm = TRUE) +
+    theme_classic() +
+    theme(plot.background = element_rect(color = "NA"),
+          axis.line.x = element_line(size=0.1),
+          axis.line.y = element_line(size=0.1),
+          axis.text.x = element_text(size = 18 / .pt, color = "black", margin = margin(t = 6, r = 0, b = 0, l = 0)),
+          axis.title.x = element_text(size = 16 / .pt, color = "black", margin = margin(t = 6, r = 0, b = 0, l = 0)),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          axis.title.y = element_text(size = 18 / .pt, color = "black", margin = margin(t = 0, r = 8, b = 0, l = 0)),
+          axis.text.y = element_text(size = 16 / .pt, color = "black", margin = margin(t = 0, r = 6, b = 0, l = 0)),
+          axis.ticks.length = unit(-0.1, "cm"),
+          axis.ticks = element_line(size=0.1),
+          legend.position = "top") +
+    coord_cartesian(ylim=c(0,8), xlim=c(0,60)) +
+    ylab("Acidobacterium CoA2 C42 OTU Percent Abundance") + 
+    xlab("Microcystis OTU Percent Abundance")
+
+Microcystis_vs_Acido_WLE_100um_ret <- Microcystis_vs_Bryo_100um_ret + Microcystis_vs_Palud_100um_ret
+ggsave("Microcystis_vs_Acido_WLE_100um_ret.pdf", Microcystis_vs_Acido_WLE_100um_ret, width = 175, height = 85, units = "mm")
+Microcystis_vs_Acido_WLE_100um_ret
+```
+Calculate the regression statistics:  
+```{r}
+#First, Bryobacter:  
+#calculate the correlation:
+cor(LE_H2O2_2019_all.merged.summary.wide.100umret_only$Microcystis_mean, LE_H2O2_2019_all.merged.summary.wide.100umret_only$Bryobacter_mean, method = "pearson")
+#Build a linear model:
+#syntax is lm(y-variable ~ x-variable)
+regMCvsBryo_WLE_100um_ret <- lm(Bryobacter_mean ~ Microcystis_mean, data=LE_H2O2_2019_all.merged.summary.wide.100umret_only)
+summary(regMCvsBryo_WLE_100um_ret)
+
+#Second Paludibaculum:
+#calculate the correlation:
+cor(LE_H2O2_2019_all.merged.summary.wide.100umret_only$Microcystis_mean, LE_H2O2_2019_all.merged.summary.wide.100umret_only$Paludibaculum_mean, method = "pearson")
+#Build a linear model:
+#syntax is lm(y-variable ~ x-variable)
+regMCvsPalud_WLE_100um_ret <- lm(Paludibaculum_mean ~ Microcystis_mean, data=LE_H2O2_2019_all.merged.summary.wide.100umret_only)
+summary(regMCvsPalud_WLE_100um_ret)
+```
+
+Plot the abundance of both Acidobacteria in Whole water, 100 retentate and 100 filtered samples:
+```{r}
+#Remove colony samples:
+LE_H2O2_2019_all.merged.summary.wide <- LE_H2O2_2019_all.merged.summary.wide[ LE_H2O2_2019_all.merged.summary.wide$Sample_Type != "Colony", ]
+
+#Remove sample where no size fractionation was done:
+drop <- c("11-Aug-14", "10-Jul-18", "24-Jul-18", "31-Jul-18", "7-Aug-18", "14-Aug-18", "18-Sep-18", "23-Jul-19", "2-Aug-19", "21-Aug-19", "17-Sep-19")
+
+LE_H2O2_2019_all.merged.summary.wide <- LE_H2O2_2019_all.merged.summary.wide[ !(LE_H2O2_2019_all.merged.summary.wide$Date_Collected %in% drop), ]
+
+LE_H2O2_2019_all.merged.summary.wide$Date_Collected <- dmy(LE_H2O2_2019_all.merged.summary.wide$Date_Collected)
+LE_H2O2_2019_all.merged.summary.wide$year <- year(LE_H2O2_2019_all.merged.summary.wide$Date_Collected)
+LE_H2O2_2019_all.merged.summary.wide <- LE_H2O2_2019_all.merged.summary.wide[ LE_H2O2_2019_all.merged.summary.wide$year != 2017, ]
+
+#Plot
+Bryo_WLE_size_frac_plot <- filter(LE_H2O2_2019_all.merged.summary.wide, year == "2014") %>% ggplot(aes(y=Bryobacter_mean, x=as.factor(Date_Collected), fill=Sample_Type)) +
+    geom_bar(position="dodge", stat="identity") +
+    facet_wrap(~Station, nrow = 3) +
+    theme_classic() +
+    theme(plot.background = element_rect(color = "NA"),
+        strip.background = element_blank(),
+        panel.spacing = unit(5, "mm"),
+        axis.line.x = element_line(size=0.1),
+        axis.line.y = element_line(size=0.1),
+        axis.text.x = element_text(size = 18 / .pt, color = "black", angle = 45, hjust = 1, margin = margin(t = 6, r = 0, b = 0, l = 0)),
+        axis.title.x = element_text(size = 16 / .pt, color = "black", margin = margin(t = 6, r = 0, b = 0, l = 0)),
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        axis.title.y = element_text(size = 18 / .pt, color = "black", margin = margin(t = 0, r = 8, b = 0, l = 0)),
+        axis.text.y = element_text(size = 16 / .pt, color = "black", margin = margin(t = 0, r = 6, b = 0, l = 0)),
+        axis.ticks.length = unit(-0.1, "cm"),
+        axis.ticks = element_line(size=0.1),
+        legend.title = element_blank(),
+        legend.position = "top") +
+    xlab("") +
+    ylab("Percent abundance")
+
+Palud_WLE_size_frac_plot <- filter(LE_H2O2_2019_all.merged.summary.wide, year == "2014") %>% ggplot(aes(y=Paludibaculum_mean, x=as.factor(Date_Collected), fill=Sample_Type)) +
+    geom_bar(position="dodge", stat="identity") +
+    facet_wrap(~Station, nrow = 3) +
+    theme_classic() +
+    theme(plot.background = element_rect(color = "NA"),
+        strip.background = element_blank(),
+        panel.spacing = unit(5, "mm"),
+        axis.line.x = element_line(size=0.1),
+        axis.line.y = element_line(size=0.1),
+        axis.text.x = element_text(size = 18 / .pt, color = "black", angle = 45, hjust = 1, margin = margin(t = 6, r = 0, b = 0, l = 0)),
+        axis.title.x = element_text(size = 16 / .pt, color = "black", margin = margin(t = 6, r = 0, b = 0, l = 0)),
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        axis.title.y = element_text(size = 18 / .pt, color = "black", margin = margin(t = 0, r = 8, b = 0, l = 0)),
+        axis.text.y = element_text(size = 16 / .pt, color = "black", margin = margin(t = 0, r = 6, b = 0, l = 0)),
+        axis.ticks.length = unit(-0.1, "cm"),
+        axis.ticks = element_line(size=0.1),
+        legend.title = element_blank(),
+        legend.position = "top") +
+    coord_cartesian(ylim=c(0,6)) +
+    xlab("") +
+    ylab("Percent abundance")
+
+
+Acido_WLE_size_frac_plot <- Bryo_WLE_size_frac_plot + Palud_WLE_size_frac_plot
+Acido_WLE_size_frac_plot
+ggsave("Acido_WLE_100um_plot.pdf", Acido_WLE_size_frac_plot, width=175, height=175, units="mm")
+```
+
+Check how similar all of the predicted protein sequences are in both Acidobacteria genomes to proteins published in NCBI nr:
+
+Done on vondamm:
+working directory: /geomicro/data22/smitdere/Acidobacteria_Genome_Analysis/
+
+command:
+nohup blastp -query Paludibaculum_CoA2_C42_simple_headers.genes.faa -db /geomicro/data9/flux/reference-data/blast/nr -outfmt "7 std qlen slen qcovs staxids" -out Paludibaculum_CoA2_C42_genes_vs_nr.blastp &> Paludibaculum_CoA2_C42_genes_vs_nr.log &
+
+nohup blastp -query Bryobacter_CoA8_C33_genes_simple_headers.faa -db /geomicro/data9/flux/reference-data/blast/nr -outfmt "7 std qlen slen qcovs staxids" -out Bryobacter_CoA8_C33_genes_vs_nr.blastp &> Bryobacter_CoA8_C33_genes_vs_nr.log &
+
+The above finished at 10:30 on Nov 12th.
+
+Filter the blast output into a tab-delimited table and only include hits with a bit score below 1e-5: 
+Done on vondamm:
+working directory: /geomicro/data22/smitdere/Acidobacteria_Genome_Analysis/
+
+command:
+perl /geomicro/data1/COMMON/scripts/BlastTools/postBlast.pl -b Bryobacter_CoA8_C33_genes_vs_nr.blastp -e 1e-5 -o Bryobacter_CoA8_C33_genes_vs_nr.postblast.txt
+
+perl /geomicro/data1/COMMON/scripts/BlastTools/postBlast.pl -b Paludibaculum_CoA2_C42_genes_vs_nr.blastp -e 1e-5 -o Paludibaculum_CoA2_C42_genes_vs_nr.postblast.txt
+
+Next, only keep best hit in nr for each gene in the genomes: 
+command:  
+perl /geomicro/data1/COMMON/scripts/BlastTools/top5.pl -b Bryobacter_CoA8_C33_genes_vs_nr.postblast.txt -t 1 -o Bryobacter_CoA8_C33_genes_vs_nr.postblast.top1.txt  
+
+perl /geomicro/data1/COMMON/scripts/BlastTools/top5.pl -b Paludibaculum_CoA2_C42_genes_vs_nr.postblast.txt -t 1 -o Paludibaculum_CoA2_C42_genes_vs_nr.postblast.top1.txt  
+
+The above step makes sure that I'm only showing the % identity to the best match in NCBI for each gene. (Rather than having multiple matches per gene)  
+
+Get the annotation for each of the listed NCBI taxonomy IDs:  
+commands:  
+comics python3 get_NCBI_accessions.py Paludibaculum_CoA2_C42_genes_vs_nr.postblast.top1.txt > Paludibaculum_CoA2_C42_genes_vs_nr.postblast.top1.NCBIaccessions.txt
+
+comics python3 get_NCBI_accessions.py Bryobacter_CoA8_C33_genes_vs_nr.postblast.top1.txt > Bryobacter_CoA8_C33_genes_vs_nr.postblast.top1.NCBIaccessions.txt
+
+Load these dataframes into R to make histograms:  
+```{r}
+Bryo_genes_vs_nr <- read.table("Bryobacter_CoA8_C33_genes_vs_nr.postblast.top1.NCBIaccessions.txt", sep = "\t")
+Acido_genes_vs_nr <- read.table("Paludibaculum_CoA2_C42_genes_vs_nr.postblast.top1.NCBIaccessions.txt", sep = "\t")
+
+cols <- c("GeneID", "nrID", "Perc_ID", "Aln_Len", "Mismatches", "Gaps", "Qstart", "QStop", "Sstart", "Sstop", "evalue", "bit_score", "Gene_Len", "nr_len", "Q_cov", "NCBI_taxID", "NR_annotation")
+colnames(Bryo_genes_vs_nr) <- cols
+colnames(Acido_genes_vs_nr) <- cols
+
+#Make the histogram of percent identity for each genome:
+#First Bryobacter
+#Filter out alignments that cover less than 70% of the gene length:
+bryo_geneID_histogram <- filter(Bryo_genes_vs_nr, Q_cov > 70) %>%
+  ggplot(aes(x=Perc_ID)) +
+  geom_histogram(breaks = c(0,10,20,30,40,50,60,70,80,90,100), color="black", fill="white") +
+  scale_x_continuous(breaks = c(0,10,20,30,40,50,60,70,80,90,100)) +
+  ggtitle("Bryobacter CoA8 C33") +
+  theme_classic() +
+  theme(plot.background = element_rect(color = "NA"),
+      strip.background = element_blank(),
+      panel.spacing = unit(5, "mm"),
+      axis.line.x = element_line(size=0.1),
+      axis.line.y = element_line(size=0.1),
+      axis.text.x = element_text(size = 18 / .pt, color = "black", angle = 45, hjust = 1, margin = margin(t = 6, r = 0, b = 0, l = 0)),
+      axis.title.x = element_text(size = 16 / .pt, color = "black", margin = margin(t = 6, r = 0, b = 0, l = 0)),
+      panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+      axis.title.y = element_text(size = 18 / .pt, color = "black", margin = margin(t = 0, r = 8, b = 0, l = 0)),
+      axis.text.y = element_text(size = 16 / .pt, color = "black", margin = margin(t = 0, r = 6, b = 0, l = 0)),
+      axis.ticks.length = unit(-0.1, "cm"),
+      axis.ticks = element_line(size=0.1),
+      legend.title = element_blank(),
+      legend.position = "top") +
+    xlab("Shared amino acid identity (%)") +
+    ylab("Number of genes") +
+    coord_cartesian(ylim=c(0,250))
+
+Acido_geneID_histogram <- filter(Acido_genes_vs_nr, Q_cov > 70) %>%
+  ggplot(aes(x=Perc_ID)) +
+  geom_histogram(breaks = c(0,10,20,30,40,50,60,70,80,90,100), color="black", fill="white") +
+  scale_x_continuous(breaks = c(0,10,20,30,40,50,60,70,80,90,100)) +
+  ggtitle("Acidobacterium CoA2 C42") +
+  theme_classic() +
+  theme(plot.background = element_rect(color = "NA"),
+      strip.background = element_blank(),
+      panel.spacing = unit(5, "mm"),
+      axis.line.x = element_line(size=0.1),
+      axis.line.y = element_line(size=0.1),
+      axis.text.x = element_text(size = 18 / .pt, color = "black", angle = 45, hjust = 1, margin = margin(t = 6, r = 0, b = 0, l = 0)),
+      axis.title.x = element_text(size = 16 / .pt, color = "black", margin = margin(t = 6, r = 0, b = 0, l = 0)),
+      panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+      axis.title.y = element_text(size = 18 / .pt, color = "black", margin = margin(t = 0, r = 8, b = 0, l = 0)),
+      axis.text.y = element_text(size = 16 / .pt, color = "black", margin = margin(t = 0, r = 6, b = 0, l = 0)),
+      axis.ticks.length = unit(-0.1, "cm"),
+      axis.ticks = element_line(size=0.1),
+      legend.title = element_blank(),
+      legend.position = "top") +
+    xlab("Shared amino acid identity (%)") +
+    ylab("Number of genes") +
+    coord_cartesian(ylim=c(0,400))
+
+Combined_histogram <- bryo_geneID_histogram + Acido_geneID_histogram
+Combined_histogram
+ggsave("Acido_gene_blastp_histogram.pdf", Combined_histogram, width=175, height=85, units="mm")
+```
+What is the taxonomy of the the proteins with significant hits in either genome?  
+```{r}
+Bryo_genes_taxID <- filter(Bryo_genes_vs_nr, Q_cov > 70) %>% group_by(NCBI_taxID) %>% summarise(n=n())
+Bryo_genes_taxID <- Bryo_genes_taxID[order(-Bryo_genes_taxID$n),]
+Bryo_genes_taxID_pie <- pie(Bryo_genes_taxID$n, labels=Bryo_genes_taxID$NCBI_taxID[1:3])
+Bryo_genes_taxID_pie
+```
+NCBI taxonomy ID annotations:  
+360054 = Bryobacter agggregatus  
+1978231 = Acidobacteria
+234267 = Candidatus Solibacter
+332163 = Candidatus Solibacter usitatus
+
+The best matches in NCBI line up with the assigned Bin taxonomy.  
+
+Now lets look at Acidobacteria CoA2 C42:  
+```{r}
+Acido_genes_taxID <- filter(Acido_genes_vs_nr, Q_cov > 70) %>% group_by(NCBI_taxID) %>% summarise(n=n())
+Acido_genes_taxID <- Acido_genes_taxID[order(-Acido_genes_taxID$n),]
+Acido_genes_taxID_pie <- pie(Acido_genes_taxID$n, labels=Acido_genes_taxID$NCBI_taxID[1:10])
+Acido_genes_taxID_pie
+```
+NCBI taxonomy annotations:  
+1978231 = Acidobacteria
+1970571 = Acidobacteria 12-62-4
+360054 = Bryobacter aggregatus
+234267;332163 = Candidatus Solibacter
+1267535 = Acidobacteria KBS 96
+2043165 = Candidatus Sulfopaludibacter
+2081523 = Acidobacteriia
+2043164 = Candidatus Sulfopaludibacter SbA3
+2043166 = Candidatus Sulfopaludibacter SbA6
+2026780 = Planctomycetes
+
+
+
+
+
+
+
